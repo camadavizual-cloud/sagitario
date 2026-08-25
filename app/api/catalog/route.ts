@@ -41,8 +41,18 @@ export async function GET() {
   };
 
   const read = async (table: string): Promise<Row[]> => {
+    const headers: Record<string, string> = {
+      apikey: key,
+      "Accept-Profile": schema,
+    };
+
+    // New Supabase sb_publishable_/sb_secret_ keys are opaque API keys, not
+    // JWTs. Sending one as a Bearer token makes PostgREST reject the request.
+    // Legacy anon/service_role keys are JWTs and still support Authorization.
+    if (!key.startsWith("sb_")) headers.Authorization = `Bearer ${key}`;
+
     const response = await fetch(`${url}/rest/v1/${encodeURIComponent(table)}?select=*`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, "Accept-Profile": schema },
+      headers,
       cache: "no-store",
     });
     if (!response.ok) {

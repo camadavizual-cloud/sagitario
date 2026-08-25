@@ -1,6 +1,6 @@
 # Sagitário — Montador de Propostas
 
-Aplicação de página única da Frame Rec para selecionar serviços, calcular valores e gerar propostas comerciais em PDF.
+Aplicação da Frame Rec para selecionar serviços, calcular valores, gerar propostas comerciais em PDF e administrar o catálogo em `/admin`.
 
 ## Requisitos
 
@@ -27,5 +27,6 @@ Variáveis obrigatórias:
 
 - `SUPABASE_URL`
 - `SUPABASE_SECRET_KEY`
+- `ADMIN_PASSWORD`
 
 As demais variáveis de mapeamento são opcionais e só precisam ser alteradas quando os nomes do schema ou das tabelas forem diferentes.

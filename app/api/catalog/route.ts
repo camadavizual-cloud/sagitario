@@ -26,8 +26,13 @@ function ids(row: Row): string[] {
 }
 
 export async function GET() {
-  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY;
+  const cleanEnv = (input?: string) => input?.trim().replace(/^(["'])(.*)\1$/, "$2").trim();
+  const url = cleanEnv(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)?.replace(/\/$/, "");
+  const key = cleanEnv(
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY,
+  );
   if (!url || !key) {
     return NextResponse.json({ message: "Cadastre SUPABASE_URL e SUPABASE_SECRET_KEY nas variáveis protegidas deste novo Site." }, { status: 503 });
   }
@@ -83,6 +88,20 @@ export async function GET() {
     return NextResponse.json({ niches, categories, services, company }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao ler o catálogo do Supabase.";
-    return NextResponse.json({ message: `${message} Confira os nomes das tabelas ou cadastre as variáveis opcionais de mapeamento.` }, { status: 502 });
+    const invalidKey = /invalid api key/i.test(message);
+    return NextResponse.json(
+      {
+        message: invalidKey
+          ? "A chave configurada foi rejeitada pelo Supabase. Confirme se a URL e a chave pertencem ao mesmo projeto."
+          : `${message} Confira os nomes das tabelas ou cadastre as variáveis opcionais de mapeamento.`,
+      },
+      {
+        status: 502,
+        headers: {
+          "Cache-Control": "no-store",
+          "X-Sagitario-Build": "supabase-key-normalization-v2",
+        },
+      },
+    );
   }
 }

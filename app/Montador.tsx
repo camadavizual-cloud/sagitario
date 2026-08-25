@@ -29,6 +29,7 @@ export default function Home() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [nicheId, setNicheId] = useState("");
   const [selection, setSelection] = useState<Selection>({});
   const [search, setSearch] = useState("");
@@ -40,17 +41,27 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     fetch("/api/catalog", { cache:"no-store" }).then(async (response) => {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || "Não foi possível carregar os dados.");
       return payload as Catalog;
     }).then((payload) => {
       if (!active) return;
+      setLoadError(null);
       setCatalog(payload);
       setNicheId(payload.niches[0]?.id || "");
-    }).catch((error: Error) => active && setLoadError(error.message)).finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, []);
+    }).catch((error: Error) => {
+      if (!active) return;
+      setLoadError(error.message);
+      retryTimer = setTimeout(() => {
+        if (!active) return;
+        setLoading(true);
+        setReloadKey((current) => current + 1);
+      }, 6000);
+    }).finally(() => active && setLoading(false));
+    return () => { active = false; if (retryTimer) clearTimeout(retryTimer); };
+  }, [reloadKey]);
 
   const servicesById = useMemo(() => new Map((catalog?.services || []).map((service) => [service.id, service])), [catalog]);
   const nicheServices = useMemo(() => (catalog?.services || []).filter((service) => service.nicheIds.length === 0 || service.nicheIds.includes(nicheId)), [catalog, nicheId]);
@@ -111,7 +122,7 @@ export default function Home() {
   </>;
 
   if (loading) return <main className="statePage"><div className="loader" /><h1>Carregando o Sagitário…</h1><p>Buscando nichos e serviços.</p></main>;
-  if (loadError) return <main className="statePage configState"><Brand /><span className="statusBadge">Configuração pendente</span><h1>Conecte este Site ao Supabase</h1><p>{loadError}</p><div className="configKeys"><code>SUPABASE_URL</code><code>SUPABASE_SECRET_KEY</code></div><small>As credenciais devem ser cadastradas nas variáveis protegidas do Site. Nenhum dado fictício foi carregado.</small></main>;
+  if (loadError) return <main className="statePage configState"><Brand /><span className="statusBadge">Reconectando</span><h1>Conexão temporariamente indisponível</h1><p>{loadError}</p><button className="primaryButton" onClick={() => { setLoadError(null); setLoading(true); setReloadKey((current) => current + 1); }}>Tentar novamente</button><small>O Sagitário tentará reconectar automaticamente em alguns segundos.</small></main>;
   if (!catalog) return null;
 
   return <>

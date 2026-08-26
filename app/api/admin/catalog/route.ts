@@ -49,6 +49,25 @@ async function loadRows(resource: AdminResource, config: AdminConfig, limitOne =
   return response.json() as Promise<Array<Record<string, unknown>>>;
 }
 
+async function removeLegacyPlanLinks(serviceId: string, config: AdminConfig) {
+  const table = process.env.SUPABASE_PLAN_ITEMS_TABLE?.trim() || "plan_items";
+  const { url, key, schema } = config;
+  const sampleResponse = await fetch(url + "/rest/v1/" + encodeURIComponent(table) + "?select=*&limit=1", {
+    headers: supabaseHeaders(key, schema),
+    cache: "no-store",
+  });
+  if (!sampleResponse.ok) return false;
+  const sample = ((await sampleResponse.json()) as Array<Record<string, unknown>>)[0] || {};
+  const serviceColumn = ["service_id", "servico_id", "serviço_id"].find((column) => Object.prototype.hasOwnProperty.call(sample, column));
+  if (!serviceColumn) return false;
+  const endpoint = url + "/rest/v1/" + encodeURIComponent(table) + "?" + encodeURIComponent(serviceColumn) + "=eq." + encodeURIComponent(serviceId);
+  const response = await fetch(endpoint, {
+    method: "DELETE",
+    headers: supabaseHeaders(key, schema, true),
+  });
+  return response.ok;
+}
+
 export async function GET() {
   if (!await isAdminAuthorized()) return NextResponse.json({ message: "Acesso não autorizado." }, { status: 401 });
   const resolved = configResponse();
@@ -131,14 +150,24 @@ export async function DELETE(request: Request) {
     const idColumn = sourceIdColumn(body.resource, sample);
     const { url, key, schema, tables } = resolved.config;
     const endpoint = url + "/rest/v1/" + encodeURIComponent(tables[body.resource]) + "?" + encodeURIComponent(idColumn) + "=eq." + encodeURIComponent(String(body.id));
-    const response = await fetch(endpoint, {
+    let response = await fetch(endpoint, {
       method: "DELETE",
       headers: supabaseHeaders(key, schema, true),
     });
     if (!response.ok) {
       const detail = await readError(response);
+      const isPlanLink = body.resource === "services" && /plan_items|plan.*service|service.*plan/i.test(detail);
+      if (isPlanLink && await removeLegacyPlanLinks(String(body.id), resolved.config)) {
+        response = await fetch(endpoint, {
+          method: "DELETE",
+          headers: supabaseHeaders(key, schema, true),
+        });
+        if (response.ok) return NextResponse.json({ deleted: true, removedLegacyPlanLinks: true });
+        const retryDetail = await readError(response);
+        return NextResponse.json({ message: "O vínculo antigo de plano foi removido, mas outro registro ainda protege este serviço: " + retryDetail }, { status: 409 });
+      }
       if (/23503|foreign key|violates.*constraint/i.test(detail)) {
-        return NextResponse.json({ message: "Este cadastro possui itens relacionados. Apague primeiro os serviços ou categorias vinculados." }, { status: 409 });
+        return NextResponse.json({ message: "Este cadastro ainda está ligado a outro registro protegido no Supabase. " + detail }, { status: 409 });
       }
       return NextResponse.json({ message: detail }, { status: response.status });
     }

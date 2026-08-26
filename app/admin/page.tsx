@@ -97,6 +97,7 @@ export default function AdminPage() {
 
   const remove = async (resource: Resource, item: Niche | Category | Service) => {
     if (!window.confirm(`Apagar “${item.name}” permanentemente? Esta ação não pode ser desfeita.`)) return;
+    if (resource === "services" && !window.confirm("Se este serviço estiver em algum plano antigo, o vínculo com esse plano também será apagado. Continuar?")) return;
     setLoading(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/admin/catalog", {

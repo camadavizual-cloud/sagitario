@@ -15,6 +15,7 @@ type Conditions = { client: string; responsible: string; email: string; phone: s
 const initialConditions: Conditions = { client:"", responsible:"", email:"", phone:"", validity:"15 dias", start:"", term:"3 meses", payment:"Pix ou boleto", dueDay:"10", notes:"" };
 const currency = new Intl.NumberFormat("pt-BR", { style:"currency", currency:"BRL" });
 const formatMoney = (value: number) => currency.format(Number.isFinite(value) ? value : 0);
+const ADMIN_URL = "https://sagitario.camadavisual.com.br/admin?origem=montador-v4";
 const MONTHLY_PLAN_RATE = 0.4;
 
 function Brand({ compact = false }: { compact?: boolean }) {

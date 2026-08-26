@@ -27,13 +27,15 @@ async function readError(response: Response) {
   }
 }
 
-function configResponse() {
+type AdminConfig = ReturnType<typeof getSupabaseAdminConfig> & { url: string; key: string };
+
+function configResponse(): { config: AdminConfig | null; response: NextResponse | null } {
   const config = getSupabaseAdminConfig();
   if (!config.url || !config.key) return { config: null, response: NextResponse.json({ message: "Supabase ainda não configurado." }, { status: 503 }) };
-  return { config, response: null };
+  return { config: config as AdminConfig, response: null };
 }
 
-async function loadRows(resource: AdminResource, config: NonNullable<ReturnType<typeof configResponse>["config"]>, limitOne = false) {
+async function loadRows(resource: AdminResource, config: AdminConfig, limitOne = false) {
   const { url, key, schema, tables } = config;
   const suffix = limitOne ? "&limit=1" : "";
   const response = await fetch(url + "/rest/v1/" + encodeURIComponent(tables[resource]) + "?select=*" + suffix, {

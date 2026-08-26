@@ -28,8 +28,11 @@ async function readError(response: Response) {
 }
 
 type AdminConfig = ReturnType<typeof getSupabaseAdminConfig> & { url: string; key: string };
+type ConfigResult =
+  | { config: AdminConfig; response: null }
+  | { config: null; response: NextResponse };
 
-function configResponse(): { config: AdminConfig | null; response: NextResponse | null } {
+function configResponse(): ConfigResult {
   const config = getSupabaseAdminConfig();
   if (!config.url || !config.key) return { config: null, response: NextResponse.json({ message: "Supabase ainda não configurado." }, { status: 503 }) };
   return { config: config as AdminConfig, response: null };

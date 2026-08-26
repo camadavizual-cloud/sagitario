@@ -96,8 +96,12 @@ export default function AdminPage() {
   };
 
   const remove = async (resource: Resource, item: Niche | Category | Service) => {
-    if (!window.confirm(`Apagar “${item.name}” permanentemente? Esta ação não pode ser desfeita.`)) return;
-    if (resource === "services" && !window.confirm("Se este serviço estiver em algum plano antigo, o vínculo com esse plano também será apagado. Continuar?")) return;
+    const legacyNotice = resource === "services"
+      ? " O vínculo deste serviço com planos antigos também será apagado."
+      : resource === "niches"
+        ? " Os planos antigos ligados a este nicho e seus itens também serão apagados. Propostas e históricos continuarão protegidos."
+        : "";
+    if (!window.confirm(`Apagar “${item.name}” permanentemente? Esta ação não pode ser desfeita.${legacyNotice}`)) return;
     setLoading(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/admin/catalog", {

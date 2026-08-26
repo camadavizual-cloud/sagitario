@@ -49,23 +49,98 @@ async function loadRows(resource: AdminResource, config: AdminConfig, limitOne =
   return response.json() as Promise<Array<Record<string, unknown>>>;
 }
 
-async function removeLegacyPlanLinks(serviceId: string, config: AdminConfig) {
-  const table = process.env.SUPABASE_PLAN_ITEMS_TABLE?.trim() || "plan_items";
+type LegacyCleanup = {
+  planItems: number;
+  plans: number;
+};
+
+const legacyTableNames = {
+  plans: process.env.SUPABASE_PLANS_TABLE?.trim() || "plans",
+  planItems: process.env.SUPABASE_PLAN_ITEMS_TABLE?.trim() || "plan_items",
+};
+
+const legacyColumns = {
+  id: ["id", "uuid", "plan_id", "plano_id", "codigo"],
+  niche: ["niche_id", "nicho_id", "segment_id"],
+  plan: ["plan_id", "plano_id"],
+  service: ["service_id", "servico_id", "serviço_id"],
+};
+
+function matchingColumn(sample: Record<string, unknown>, candidates: string[]) {
+  return candidates.find((column) => Object.prototype.hasOwnProperty.call(sample, column));
+}
+
+async function loadLegacyRows(
+  table: string,
+  config: AdminConfig,
+  column?: string,
+  value?: string,
+) {
   const { url, key, schema } = config;
-  const sampleResponse = await fetch(url + "/rest/v1/" + encodeURIComponent(table) + "?select=*&limit=1", {
+  const filter = column && value !== undefined
+    ? "&" + encodeURIComponent(column) + "=eq." + encodeURIComponent(value)
+    : "&limit=1";
+  const response = await fetch(url + "/rest/v1/" + encodeURIComponent(table) + "?select=*" + filter, {
     headers: supabaseHeaders(key, schema),
     cache: "no-store",
   });
-  if (!sampleResponse.ok) return false;
-  const sample = ((await sampleResponse.json()) as Array<Record<string, unknown>>)[0] || {};
-  const serviceColumn = ["service_id", "servico_id", "serviço_id"].find((column) => Object.prototype.hasOwnProperty.call(sample, column));
-  if (!serviceColumn) return false;
-  const endpoint = url + "/rest/v1/" + encodeURIComponent(table) + "?" + encodeURIComponent(serviceColumn) + "=eq." + encodeURIComponent(serviceId);
+  if (response.status === 404) return [];
+  if (!response.ok) {
+    const detail = await readError(response);
+    if (/42P01|does not exist|not found/i.test(detail)) return [];
+    throw new Error(detail);
+  }
+  return response.json() as Promise<Array<Record<string, unknown>>>;
+}
+
+async function deleteLegacyRows(
+  table: string,
+  column: string,
+  value: string,
+  config: AdminConfig,
+) {
+  const { url, key, schema } = config;
+  const endpoint = url + "/rest/v1/" + encodeURIComponent(table) + "?" + encodeURIComponent(column) + "=eq." + encodeURIComponent(value);
   const response = await fetch(endpoint, {
     method: "DELETE",
     headers: supabaseHeaders(key, schema, true),
   });
-  return response.ok;
+  if (!response.ok) throw new Error(await readError(response));
+  const deleted = await response.json().catch(() => []);
+  return Array.isArray(deleted) ? deleted.length : 0;
+}
+
+async function removeLegacyServicePlanLinks(serviceId: string, config: AdminConfig) {
+  const sample = (await loadLegacyRows(legacyTableNames.planItems, config))[0] || {};
+  const serviceColumn = matchingColumn(sample, legacyColumns.service);
+  if (!serviceColumn) return 0;
+  return deleteLegacyRows(legacyTableNames.planItems, serviceColumn, serviceId, config);
+}
+
+async function removeLegacyNichePlans(nicheId: string, config: AdminConfig): Promise<LegacyCleanup> {
+  const planSample = (await loadLegacyRows(legacyTableNames.plans, config))[0] || {};
+  const planIdColumn = matchingColumn(planSample, legacyColumns.id);
+  const planNicheColumn = matchingColumn(planSample, legacyColumns.niche);
+  if (!planIdColumn || !planNicheColumn) return { planItems: 0, plans: 0 };
+
+  const plans = await loadLegacyRows(legacyTableNames.plans, config, planNicheColumn, nicheId);
+  const planIds = plans
+    .map((plan) => String(plan[planIdColumn] ?? "").trim())
+    .filter(Boolean);
+
+  let planItems = 0;
+  if (planIds.length) {
+    const itemSample = (await loadLegacyRows(legacyTableNames.planItems, config))[0] || {};
+    const itemPlanColumn = matchingColumn(itemSample, legacyColumns.plan);
+    if (itemPlanColumn) {
+      for (const planId of planIds) {
+        planItems += await deleteLegacyRows(legacyTableNames.planItems, itemPlanColumn, planId, config);
+      }
+    }
+  }
+
+  const deletedPlans = await deleteLegacyRows(legacyTableNames.plans, planNicheColumn, nicheId, config);
+  return { planItems, plans: deletedPlans };
 }
 
 export async function GET() {
@@ -156,17 +231,33 @@ export async function DELETE(request: Request) {
     });
     if (!response.ok) {
       const detail = await readError(response);
-      const isPlanLink = body.resource === "services" && /plan_items|plan.*service|service.*plan/i.test(detail);
-      if (isPlanLink && await removeLegacyPlanLinks(String(body.id), resolved.config)) {
+      const isForeignKey = /23503|foreign key|violates.*constraint/i.test(detail);
+      const isServicePlanLink = body.resource === "services" && /plan_items|plan.*service|service.*plan/i.test(detail);
+      const isNichePlanLink = body.resource === "niches" && /plans|plan.*niche|niche.*plan/i.test(detail);
+
+      if (isServicePlanLink) {
+        const removedPlanItems = await removeLegacyServicePlanLinks(String(body.id), resolved.config);
         response = await fetch(endpoint, {
           method: "DELETE",
           headers: supabaseHeaders(key, schema, true),
         });
-        if (response.ok) return NextResponse.json({ deleted: true, removedLegacyPlanLinks: true });
+        if (response.ok) return NextResponse.json({ deleted: true, removedLegacyPlanItems: removedPlanItems });
         const retryDetail = await readError(response);
         return NextResponse.json({ message: "O vínculo antigo de plano foi removido, mas outro registro ainda protege este serviço: " + retryDetail }, { status: 409 });
       }
-      if (/23503|foreign key|violates.*constraint/i.test(detail)) {
+
+      if (isNichePlanLink) {
+        const cleanup = await removeLegacyNichePlans(String(body.id), resolved.config);
+        response = await fetch(endpoint, {
+          method: "DELETE",
+          headers: supabaseHeaders(key, schema, true),
+        });
+        if (response.ok) return NextResponse.json({ deleted: true, removedLegacy: cleanup });
+        const retryDetail = await readError(response);
+        return NextResponse.json({ message: "Os planos antigos ligados ao nicho foram removidos, mas outro registro ainda protege este nicho: " + retryDetail }, { status: 409 });
+      }
+
+      if (isForeignKey) {
         return NextResponse.json({ message: "Este cadastro ainda está ligado a outro registro protegido no Supabase. " + detail }, { status: 409 });
       }
       return NextResponse.json({ message: detail }, { status: response.status });

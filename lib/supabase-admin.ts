@@ -53,7 +53,7 @@ const aliases: Record<Resource, Record<string, string[]>> = {
     niche_id: ["niche_id", "nicho_id", "segment_id"],
     category_id: ["category_id", "categoria_id"],
     name: ["name", "nome", "title", "titulo", "título"],
-    description: ["description", "descricao", "descrição", "resumo", "short_description"],
+    description: ["description", "commercial_description", "descricao", "descrição", "resumo", "short_description"],
     unit: ["unit", "unidade", "price_unit", "unidade_preco", "unidade_preço"],
     billing_type: ["billing_type", "charge_type", "tipo_cobranca", "tipo_cobrança", "cobranca", "cobrança", "recurrence"],
     price: ["price", "preco", "preço", "valor", "unit_price", "valor_unitario", "valor_unitário"],

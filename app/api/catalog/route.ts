@@ -77,7 +77,7 @@ export async function GET() {
     const niches = nicheRows.filter(active).map((row) => ({ id: text(row, "id", "uuid", "slug"), name: text(row, "name", "nome", "title", "titulo") })).filter((item) => item.id && item.name);
     const categories = categoryRows.filter(active).map((row) => ({ id: text(row, "id", "uuid", "slug"), name: text(row, "name", "nome", "title", "titulo"), nicheId: text(row, "niche_id", "nicho_id") || null, order: number(row, "sort_order", "order", "ordem", "position") }));
     const services = serviceRows.filter(active).map((row) => ({
-      id: text(row, "id", "uuid"), name: text(row, "name", "nome", "title", "titulo"), description: text(row, "description", "descricao", "resumo"),
+      id: text(row, "id", "uuid"), name: text(row, "name", "nome", "title", "titulo"), description: text(row, "description", "commercial_description", "descricao", "resumo"),
       categoryId: text(row, "category_id", "categoria_id") || null, nicheIds: ids(row), unit: text(row, "unit", "unidade", "price_unit") || "unidade",
       billingType: billingType(row), price: number(row, "price", "preco", "valor", "unit_price"), defaultQuantity: Math.max(1, number(row, "default_quantity", "quantidade_padrao") || 1),
       minQuantity: Math.max(1, number(row, "min_quantity", "quantidade_minima") || 1), maxQuantity: number(row, "max_quantity", "quantidade_maxima") || null,

@@ -127,10 +127,10 @@ export default function Home() {
 
   return <>
     <main className="appShell">
-      <header className="topbar"><Brand /><div className="headerActions"><a className="adminButton desktopAdminLink" href="/admin" aria-label="Abrir administração do Sagitário"><span aria-hidden="true">⚙</span> Admin</a><button className="secondaryButton" onClick={clearSelection}>Limpar seleção</button></div></header>
+      <header className="topbar"><Brand /><div className="headerActions"><a id="sagitario-admin-v4" className="adminButton desktopAdminLink" href={ADMIN_URL} target="_self" aria-label="Abrir administração do Sagitário"><span aria-hidden="true">⚙</span> Admin</a><button className="secondaryButton" onClick={clearSelection}>Limpar seleção</button></div></header>
       {validationMessage && <div className="validationBanner" role="alert">{validationMessage}</div>}
       <section className="nicheSection" aria-labelledby="niche-title"><div><span className="stepNumber">01</span><div><h2 id="niche-title">Escolha o nicho</h2><p>Os serviços disponíveis se adaptam à escolha.</p></div></div><div className="nicheButtons" role="group" aria-label="Nichos">{catalog.niches.map((niche) => <button key={niche.id} onClick={() => changeNiche(niche.id)} className={niche.id === nicheId ? "active" : ""}>{niche.name}</button>)}</div></section>
-      <nav className="mobileQuickNav" aria-label="Atalhos da proposta"><a href="#services">Serviços <b>{selectedServices.length}</b></a><a href="#comparison">Comparar</a><a className="adminQuickLink" href="/admin" aria-label="Abrir administração do Sagitário">⚙ Admin</a></nav>
+      <nav className="mobileQuickNav" aria-label="Atalhos da proposta"><a href="#services">Serviços <b>{selectedServices.length}</b></a><a href="#comparison">Comparar</a><a id="sagitario-admin-mobile-v4" className="adminQuickLink" href={ADMIN_URL} target="_self" aria-label="Abrir administração do Sagitário">⚙ Admin</a></nav>
       <div className="workspaceGrid">
         <div className="mainColumn">
           <section className="sectionBlock servicesSection" id="services" aria-labelledby="services-title">

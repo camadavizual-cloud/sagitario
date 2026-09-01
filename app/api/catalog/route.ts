@@ -12,7 +12,7 @@ const number = (row: Row, ...keys: string[]) => {
 const bool = (row: Row, ...keys: string[]) => [true, 1, "1", "true", "sim", "yes", "ativo"].includes(value(row, ...keys) as never);
 
 function billingType(row: Row): "monthly" | "one_time" | "setup" {
-  const raw = text(row, "billing_type", "charge_type", "tipo_cobranca", "cobranca", "recurrence").toLowerCase();
+  const raw = text(row, "billing_type", "charge_type", "tipo_cobranca", "tipo_cobrança", "cobranca", "cobrança", "recurrence").toLowerCase();
   if (["monthly", "mensal", "recurring", "recorrente", "subscription", "assinatura"].includes(raw)) return "monthly";
   if (["setup", "initial", "taxa_inicial", "implantacao", "implantação", "activation", "ativacao", "ativação"].includes(raw)) return "setup";
   return "one_time";

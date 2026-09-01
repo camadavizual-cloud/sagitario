@@ -81,7 +81,7 @@ function ContractPage({ children, className = "" }: { children: React.ReactNode;
 }
 
 function ContractMasthead({ title }: { title: string }) {
-  return <header className="contractMasthead"><div><strong>@framerec</strong><span>www.framerec.com.br</span></div><div><span>contato@framerec.com.br</span><span>(79) 99890-6462</span></div><div className="contractMark" aria-hidden="true">FR</div><h2>{title}</h2></header>;
+  return <header className="contractMasthead"><h2>{title}</h2></header>;
 }
 
 function ContractPages({ conditions, enabled }: { conditions: Conditions; enabled: boolean }) {
@@ -90,7 +90,7 @@ function ContractPages({ conditions, enabled }: { conditions: Conditions; enable
     <ContractPage className="contractIntro"><ContractMasthead title="TERMOS DE CONTRATO" /><div className="contractClient"><span>Contratante</span><strong>{conditions.client || "A preencher"}</strong>{conditions.document && <small>CNPJ / CPF: {conditions.document}</small>}{conditions.dueDay && <small>Data de vencimento: {formatDate(conditions.dueDay)}</small>}</div><h3>Proposta Comercial - Produtora Frame</h3>{contractSections[0].paragraphs?.map((text, index) => <p key={index}>{text}</p>)}</ContractPage>
     <ContractPage><ContractMasthead title="TERMOS DE CONTRATO" /><h3>{contractSections[1].title}</h3><ol>{contractSections[1].items?.map((text, index) => <li key={index}>{text}</li>)}</ol></ContractPage>
     <ContractPage><ContractMasthead title="TERMOS DE CONTRATO" /><h3>{contractSections[2].title}</h3><ol start={8}>{contractSections[2].items?.map((text, index) => <li key={index}>{text}</li>)}</ol></ContractPage>
-    <ContractPage className="contractClosing"><ContractMasthead title="PRAZOS E ENCERRAMENTO" /><h3>Prazos de entrega</h3><p className="contractLead">Referentes a demandas fora do planner mensal.</p><div className="deadlineTable">{deliveryDeadlines.map(([name, deadline]) => <div key={name}><span>{name}</span><strong>{deadline}</strong></div>)}</div><div className="contractThanks"><strong>Obrigado!</strong><p>Acompanhe-nos em nossos canais de contato. Mesmo em movimento, estamos sempre prontos para o trabalho.</p></div><div className="contractContacts"><span>www.framerec.com.br</span><span>(79) 99890-6462</span><span>contato@framerec.com.br</span></div></ContractPage>
+    <ContractPage className="contractClosing"><ContractMasthead title="PRAZOS E ENCERRAMENTO" /><h3>Prazos de entrega</h3><p className="contractLead">Referentes a demandas fora do planner mensal.</p><div className="deadlineTable">{deliveryDeadlines.map(([name, deadline]) => <div key={name}><span>{name}</span><strong>{deadline}</strong></div>)}</div><div className="contractThanks"><strong>Obrigado!</strong><p>Acompanhe-nos em nossos canais de contato. Mesmo em movimento, estamos sempre prontos para o trabalho.</p></div></ContractPage>
   </>;
 }
 

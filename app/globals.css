@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 :root { --graphite:#171916; --ink:#1d1f1c; --muted:#706f67; --off:#f6f3ed; --paper:#fffefa; --line:#ddd7c9; --red:#d7a514; --red-dark:#9a7000; --red-soft:#f7edcf; --green:#9a7000; }

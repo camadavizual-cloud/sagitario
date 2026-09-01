@@ -35,9 +35,9 @@ const nicheRelationColumns = new Set(["niche_id", "nicho_id", "segment_id", "nic
 const directNicheSchemaMessage = "Para usar apenas Nicho → Serviço, a tabela services precisa ter uma coluna niche_id (ou niche_ids) ligada à tabela niches. Execute a migração SQL fornecida nesta versão e tente novamente.";
 const billingColumns = new Set(["billing_type", "charge_type", "tipo_cobranca", "tipo_cobrança", "cobranca", "cobrança", "recurrence"]);
 const billingValueAliases: Record<ClinicSeed["billing_type"], string[]> = {
-  one_time: ["one_time", "pontual", "PONTUAL", "one-time", "one time", "avulso", "AVULSO", "avulsa", "single", "fixed", "once", "oneoff"],
-  monthly: ["monthly", "mensal", "MENSAL", "recurring", "recorrente", "subscription", "assinatura"],
-  setup: ["setup", "SETUP", "initial", "taxa_inicial", "taxa inicial", "implantacao", "implantação", "activation", "ativacao", "ativação"],
+  one_time: ["one_time", "pontual", "PONTUAL", "one-time", "one time", "avulso", "AVULSO", "avulsa", "single", "fixed", "once", "oneoff", "one_off", "per_unit"],
+  monthly: ["monthly", "mensal", "MENSAL", "recurring", "recorrente", "subscription", "assinatura", "recurring_monthly", "monthly_subscription"],
+  setup: ["setup", "SETUP", "initial", "taxa_inicial", "taxa inicial", "implantacao", "implantação", "activation", "ativacao", "ativação", "initial_fee", "setup_fee"],
 };
 
 type AdminConfig = ReturnType<typeof getSupabaseAdminConfig> & { url: string; key: string };
@@ -147,7 +147,12 @@ function billingEnumCandidates(resource: AdminResource, current: unknown, sample
     if (values) knownValues.push(...values);
     if (sample[column] !== undefined && sample[column] !== null) knownValues.push(String(sample[column]));
   }
-  return uniqueValues([current, ...knownValues, ...fallback]);
+  const billingToken = (value: unknown) => String(value ?? "").trim().toLocaleLowerCase("pt-BR").replace(/[\s-]+/g, "_");
+  const preferredKnown = knownValues.filter((value) => fallback.some((alias) => billingToken(alias) === billingToken(value)));
+  const remainingKnown = knownValues.filter((value) => !preferredKnown.includes(value));
+  // Keep the semantic match first: a monthly service must never fall back to
+  // the first enum label returned by PostgREST if that label means pontual.
+  return uniqueValues([current, ...preferredKnown, ...fallback, ...remainingKnown]);
 }
 
 function billingColumn(payload: Record<string, unknown>) {

@@ -13,8 +13,8 @@ const bool = (row: Row, ...keys: string[]) => [true, 1, "1", "true", "sim", "yes
 
 function billingType(row: Row): "monthly" | "one_time" | "setup" {
   const raw = text(row, "billing_type", "charge_type", "tipo_cobranca", "tipo_cobrança", "cobranca", "cobrança", "recurrence").toLowerCase();
-  if (["monthly", "mensal", "recurring", "recorrente", "subscription", "assinatura"].includes(raw)) return "monthly";
-  if (["setup", "initial", "taxa_inicial", "implantacao", "implantação", "activation", "ativacao", "ativação"].includes(raw)) return "setup";
+  if (["monthly", "mensal", "recurring", "recorrente", "subscription", "assinatura", "recurring_monthly", "monthly_subscription"].includes(raw)) return "monthly";
+  if (["setup", "initial", "taxa_inicial", "implantacao", "implantação", "activation", "ativacao", "ativação", "initial_fee", "setup_fee"].includes(raw)) return "setup";
   return "one_time";
 }
 

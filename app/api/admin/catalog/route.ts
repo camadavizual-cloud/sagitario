@@ -32,6 +32,30 @@ type ConfigResult =
   | { config: AdminConfig; response: null }
   | { config: null; response: NextResponse };
 
+type ClinicSeed = {
+  name: string;
+  description: string;
+  unit: string;
+  billing_type: "monthly" | "one_time" | "setup";
+  price: number;
+};
+
+const clinicSeedServices: ClinicSeed[] = [
+  { name: "Design de post simples", description: "Posts estáticos.", unit: "post", billing_type: "one_time", price: 90 },
+  { name: "Vídeo", description: "Captação na clínica, com iluminação e áudio profissional.", unit: "vídeo", billing_type: "one_time", price: 400 },
+  { name: "Criação de carrosséis", description: "Até 6 lâminas (páginas).", unit: "carrossel", billing_type: "one_time", price: 200 },
+  { name: "Disponibilidade de drone", description: "Para vídeos e fotos aéreas.", unit: "diária", billing_type: "one_time", price: 600 },
+  { name: "Programação de postagens", description: "Agendamento de publicações e criação de textos para legenda.", unit: "mês", billing_type: "monthly", price: 400 },
+  { name: "Gestão de Tráfego Pago", description: "No Meta Ads (Facebook e Instagram).", unit: "mês", billing_type: "monthly", price: 800 },
+  { name: "Planejamento estratégico", description: "Criação de roteiro, tom de voz e linha editorial de todas as publicações da marca nas redes sociais (Facebook e Instagram).", unit: "projeto", billing_type: "one_time", price: 1200 },
+];
+
+const normalizeSeedName = (value: unknown) => String(value ?? "")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .trim()
+  .toLocaleLowerCase("pt-BR");
+
 function configResponse(): ConfigResult {
   const config = getSupabaseAdminConfig();
   if (!config.url || !config.key) return { config: null, response: NextResponse.json({ message: "Supabase ainda não configurado." }, { status: 503 }) };
@@ -47,6 +71,94 @@ async function loadRows(resource: AdminResource, config: AdminConfig, limitOne =
   });
   if (!response.ok) throw new Error(await readError(response));
   return response.json() as Promise<Array<Record<string, unknown>>>;
+}
+
+async function insertCatalogRow(
+  resource: AdminResource,
+  data: Record<string, unknown>,
+  sample: Record<string, unknown>,
+  config: AdminConfig,
+) {
+  const canonical = cleanAdminPayload(resource, data);
+  const payload = mapPayloadToSource(resource, canonical, sample);
+  const payloads = [payload];
+  // The existing project uses commercial_description/unit_price in some
+  // deployments. An empty table has no sample row for the normal mapper, so
+  // keep a compatibility attempt for that schema without changing the
+  // canonical admin model.
+  if (resource === "services" && !Object.keys(sample).length) {
+    const { description, price, ...rest } = canonical;
+    payloads.push({ ...rest, commercial_description: description, unit_price: price });
+  }
+  const { url, key, schema, tables } = config;
+  let lastError = "Não foi possível criar o cadastro.";
+  for (const candidate of payloads) {
+    const response = await fetch(url + "/rest/v1/" + encodeURIComponent(tables[resource]), {
+      method: "POST",
+      headers: supabaseHeaders(key, schema, true),
+      body: JSON.stringify(candidate),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      lastError = await readError(response);
+      continue;
+    }
+    const returned = await response.json().catch(() => []);
+    const row = Array.isArray(returned) ? returned[0] : returned;
+    if (!row || typeof row !== "object") throw new Error("O Supabase não devolveu o cadastro criado.");
+    return row as Record<string, unknown>;
+  }
+  throw new Error(lastError);
+}
+
+async function ensureClinicCatalog(config: AdminConfig) {
+  const initialNiches = await loadRows("niches", config);
+  let niche = normalizeAdminRows("niches", initialNiches).find((item) => (
+    normalizeSeedName(item.name) === "clinicas" || normalizeSeedName(item.slug) === "clinicas"
+  ));
+  if (!niche) {
+    const created = await insertCatalogRow("niches", { name: "Clínicas", slug: "clinicas", active: true }, initialNiches[0] || {}, config);
+    niche = normalizeAdminRows("niches", [created])[0];
+  }
+  const nicheId = String(niche?.id || "").trim();
+  if (!nicheId) throw new Error("O nicho Clínicas foi criado sem identificador.");
+
+  const initialCategories = await loadRows("categories", config);
+  let category = normalizeAdminRows("categories", initialCategories, nicheId).find((item) => (
+    normalizeSeedName(item.name) === "clinicas" && String(item.niche_id) === nicheId
+  ));
+  if (!category) {
+    const created = await insertCatalogRow("categories", { niche_id: nicheId, name: "Clínicas", sort_order: 0, active: true }, initialCategories[0] || {}, config);
+    category = normalizeAdminRows("categories", [created], nicheId)[0];
+  }
+  const categoryId = String(category?.id || "").trim();
+  if (!categoryId) throw new Error("A categoria Clínicas foi criada sem identificador.");
+
+  const initialServices = await loadRows("services", config);
+  const normalizedServices = normalizeAdminRows("services", initialServices, nicheId);
+  let addedServices = 0;
+  for (const seed of clinicSeedServices) {
+    const exists = normalizedServices.some((item) => (
+      normalizeSeedName(item.name) === normalizeSeedName(seed.name) && String(item.category_id) === categoryId
+    ));
+    if (exists) continue;
+    const created = await insertCatalogRow("services", {
+      niche_id: nicheId,
+      category_id: categoryId,
+      name: seed.name,
+      description: seed.description,
+      unit: seed.unit,
+      billing_type: seed.billing_type,
+      price: seed.price,
+      default_quantity: 1,
+      min_quantity: 1,
+      max_quantity: null,
+      active: true,
+    }, initialServices[0] || {}, config);
+    normalizedServices.push(normalizeAdminRows("services", [created], nicheId)[0]);
+    addedServices += 1;
+  }
+  return { nicheId, categoryId, addedServices };
 }
 
 type LegacyCleanup = {
@@ -148,6 +260,7 @@ export async function GET() {
   const resolved = configResponse();
   if (!resolved.config) return resolved.response;
   try {
+    const seeded = await ensureClinicCatalog(resolved.config);
     const nicheRows = await loadRows("niches", resolved.config);
     const fallbackNicheId = nicheRows.length === 1 ? String(normalizeAdminRows("niches", nicheRows)[0]?.id || "") : "";
     const [categoryRows, serviceRows] = await Promise.all([
@@ -158,6 +271,7 @@ export async function GET() {
       niches: normalizeAdminRows("niches", nicheRows),
       categories: normalizeAdminRows("categories", categoryRows, fallbackNicheId),
       services: normalizeAdminRows("services", serviceRows, fallbackNicheId),
+      seeded,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : "Falha ao carregar a administração." }, { status: 502 });

@@ -8,6 +8,7 @@ type Niche = { id: string; name: string; slug: string; active: boolean };
 type Category = { id: string; niche_id: string; name: string; sort_order: number; active: boolean };
 type Service = { id: string; niche_id: string; category_id: string; name: string; description: string; unit: string; billing_type: "monthly" | "one_time" | "setup"; price: number; default_quantity: number; min_quantity: number; max_quantity: number | null; active: boolean };
 type AdminCatalog = { niches: Niche[]; categories: Category[]; services: Service[] };
+type SeedSummary = { addedServices?: number };
 type Resource = keyof AdminCatalog;
 
 const blankNiche: Omit<Niche, "id"> = { name: "", slug: "", active: true };
@@ -45,6 +46,8 @@ export default function AdminPage() {
         categories: [...payload.categories].sort((a: Category,b: Category) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
         services: [...payload.services].sort((a: Service,b: Service) => a.name.localeCompare(b.name)),
       });
+      const seeded = payload.seeded as SeedSummary | undefined;
+      if (seeded?.addedServices) setMessage(`${seeded.addedServices} serviços de Clínicas foram adicionados ao catálogo.`);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Falha ao carregar."); }
     finally { setLoading(false); }
   }, []);

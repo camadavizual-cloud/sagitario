@@ -488,3 +488,97 @@ button,a,.serviceInfo { -webkit-tap-highlight-color:transparent; touch-action:ma
   border-color: #a12828;
   background: #a12828;
 }
+
+/* Mobile viewport guardrails: keep the app fluid like a production SaaS shell. */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.appShell,
+.adminShell,
+.workspaceGrid,
+.mainColumn,
+.sectionBlock,
+.serviceGroup,
+.serviceList,
+.serviceRow,
+.serviceInfo,
+.adminWorkspace,
+.adminForm,
+.adminList {
+  min-width: 0;
+}
+
+@media (max-width: 820px) {
+  :root { --page-gutter: clamp(16px, 4vw, 24px); }
+
+  body { background: var(--off); }
+
+  .appShell {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-left: max(var(--page-gutter), env(safe-area-inset-left));
+    padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+    box-shadow: none;
+  }
+
+  .topbar,
+  .mobileQuickNav {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .workspaceGrid,
+  .sectionBlock,
+  .serviceRow,
+  .filtersBar,
+  .comparisonGrid {
+    width: 100%;
+  }
+
+  .comparisonGrid {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .mobileBottomBar {
+    left: 0;
+    width: 100%;
+    max-width: none;
+    transform: none;
+    border-radius: 0;
+    padding-left: max(var(--page-gutter), env(safe-area-inset-left));
+    padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+  }
+
+  .adminShell {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding-left: max(var(--page-gutter), env(safe-area-inset-left));
+    padding-right: max(var(--page-gutter), env(safe-area-inset-right));
+  }
+
+  .adminTopbar {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 540px) {
+  .comparisonCard { flex-basis: calc(100vw - (2 * var(--page-gutter))); }
+}

@@ -1216,6 +1216,62 @@ body { font-family: "Montserrat", ui-sans-serif, system-ui, -apple-system, Blink
   .proposalFields { grid-template-columns: 1fr; }
 }
 
+@media print {
+  .contractPage {
+    position: relative;
+    min-height: calc(297mm - 28mm);
+    margin: 0;
+    padding: 29mm 19mm 25mm;
+    overflow: hidden;
+    color: #282828;
+    font-family: "Montserrat", Arial, sans-serif;
+    font-size: 9.2pt;
+    line-height: 1.48;
+    break-before: page;
+    break-inside: avoid;
+  }
+  .contractLetterhead {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .contractPageContent { position: relative; z-index: 1; }
+  .contractMasthead {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 20px;
+    margin-bottom: 17mm;
+    padding-bottom: 6mm;
+    border-bottom: 1px solid #cfd0d0;
+  }
+  .contractMasthead>div { display: flex; flex-direction: column; gap: 2px; }
+  .contractMasthead>div:nth-child(2) { align-items: flex-end; text-align: right; }
+  .contractMasthead strong { font-size: 10pt; }
+  .contractMasthead span { color: #666; font-size: 8pt; }
+  .contractMasthead h2 { grid-column: 1 / -1; margin: 9mm 0 0; color: #202020; font-size: 18pt; letter-spacing: .05em; text-align: center; }
+  .contractMark { display: none !important; }
+  .contractPage h3 { margin: 0 0 10px; color: #222; font-size: 12pt; letter-spacing: .01em; }
+  .contractPage p { margin: 0 0 9px; }
+  .contractClient { display: grid; gap: 3px; margin: 0 0 15mm; padding: 11px 13px; border-left: 3px solid #272727; background: rgba(245,245,245,.88); }
+  .contractClient span { color: #666; font-size: 8pt; text-transform: uppercase; letter-spacing: .1em; }
+  .contractClient strong { font-size: 13pt; }
+  .contractClient small { color: #555; font-size: 8.5pt; }
+  .contractPage ol { margin: 0; padding-left: 19px; }
+  .contractPage li { margin: 0 0 7px; padding-left: 4px; }
+  .contractLead { color: #666; font-size: 8.5pt; }
+  .deadlineTable { margin-top: 15px; border-top: 1px solid #bbb; }
+  .deadlineTable>div { display: flex; justify-content: space-between; gap: 20px; padding: 8px 0; border-bottom: 1px solid #ddd; }
+  .deadlineTable strong { white-space: nowrap; }
+  .contractThanks { margin-top: 24mm; padding-top: 12mm; border-top: 1px solid #bbb; text-align: center; }
+  .contractThanks strong { display: block; font-size: 18pt; }
+  .contractThanks p { margin: 6px auto 0; max-width: 110mm; color: #666; }
+  .contractContacts { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 22px; margin-top: 16mm; color: #555; font-size: 8.5pt; }
+}
+
 /* The service list shows the unit price and quantity control only. */
 [data-ui="saas-v4"] .serviceRow {
   grid-template-columns: 31px minmax(0, 1fr) 108px;

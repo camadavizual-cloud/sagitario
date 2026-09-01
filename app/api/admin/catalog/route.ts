@@ -316,8 +316,11 @@ async function ensureClinicCatalog(config: AdminConfig, columns: ColumnMap) {
   const nicheId = String(niche?.id || "").trim();
   if (!nicheId) throw new Error("O nicho Clínicas foi criado sem identificador.");
   const nicheDescription = String(niche?.description || "").trim();
-  const isBootstrapMarker = nicheDescription === clinicBootstrapPending || nicheDescription === clinicBootstrapComplete;
-  const shouldBootstrap = createdNiche || isBootstrapMarker || !nicheDescription;
+  const isPendingBootstrap = nicheDescription === clinicBootstrapPending;
+  const isCompleteBootstrap = nicheDescription === clinicBootstrapComplete;
+  // A completed bootstrap is a durable snapshot: deleting a service in the
+  // admin must not make it reappear on the next page load.
+  const shouldBootstrap = createdNiche || isPendingBootstrap || (!nicheDescription && !isCompleteBootstrap);
   if (shouldBootstrap && !createdNiche && nicheDescription !== clinicBootstrapPending) {
     await updateCatalogRow("niches", nicheId, { description: clinicBootstrapPending }, initialNiches[0] || {}, config, columns.niches);
   }

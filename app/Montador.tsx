@@ -73,7 +73,7 @@ function Field({ label, children, wide = false }: { label: string; children: Rea
 }
 
 function ContractPage({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`contractPage ${className}`}><Image className="contractLetterhead" src="/frame-letterhead.svg" alt="" width={596} height={843} /><div className="contractPageContent">{children}</div></section>;
+  return <section className={`contractPage ${className}`}><Image className="contractLetterhead" src="/frame-letterhead.svg" alt="" width={596} height={843} unoptimized loading="eager" /><div className="contractPageContent">{children}</div></section>;
 }
 
 function ContractMasthead({ title }: { title: string }) {

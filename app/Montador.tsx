@@ -10,12 +10,20 @@ type Company = { name: string; logoUrl: string | null; document: string; email: 
 type Catalog = { niches: Niche[]; services: Service[]; company: Company | null };
 type Selection = Record<string, number>;
 type Conditions = { client: string; responsible: string; email: string; phone: string; validity: string; start: string; term: string; payment: string; dueDay: string; notes: string };
+type JsonObject = Record<string, unknown>;
 
 const initialConditions: Conditions = { client:"", responsible:"", email:"", phone:"", validity:"15 dias", start:"", term:"3 meses", payment:"Pix ou boleto", dueDay:"10", notes:"" };
 const currency = new Intl.NumberFormat("pt-BR", { style:"currency", currency:"BRL" });
 const formatMoney = (value: number) => currency.format(Number.isFinite(value) ? value : 0);
 const ADMIN_URL = "https://sagitario.camadavisual.com.br/admin?origem=montador-v4";
 const MONTHLY_PLAN_RATE = 0.4;
+const listValue = <T extends object>(value: unknown): T[] => Array.isArray(value)
+  ? value.filter((item): item is T => Boolean(item && typeof item === "object"))
+  : [];
+async function readJson(response: Response): Promise<JsonObject> {
+  const value = await response.json().catch(() => null);
+  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : {};
+}
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return <div className={compact ? "sagitarioBrand sagitarioBrandCompact" : "sagitarioBrand"} aria-label="Sagitário"><Image src="/sagitario-full-logo.png" alt="" width={1994} height={789} priority /></div>;
@@ -42,9 +50,18 @@ export default function Home() {
     let active = true;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     fetch("/api/catalog", { cache:"no-store" }).then(async (response) => {
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || "Não foi possível carregar os dados.");
-      return payload as Catalog;
+      const payload = await readJson(response);
+      if (!response.ok) {
+        const message = typeof payload.message === "string" && payload.message.trim() ? payload.message : "Não foi possível carregar os dados.";
+        throw new Error(message);
+      }
+      const niches = listValue<Niche>(payload.niches).filter((item) => typeof item.id === "string" && typeof item.name === "string");
+      const services = listValue<Service>(payload.services).map((item) => ({
+        ...item,
+        nicheIds: Array.isArray(item.nicheIds) ? item.nicheIds.map(String) : [],
+      })).filter((item) => typeof item.id === "string" && typeof item.name === "string" && item.nicheIds.length);
+      const company = payload.company && typeof payload.company === "object" && !Array.isArray(payload.company) ? payload.company as Company : null;
+      return { niches, services, company } satisfies Catalog;
     }).then((payload) => {
       if (!active) return;
       setLoadError(null);
@@ -114,8 +131,9 @@ export default function Home() {
   if (!catalog) return null;
 
   return <>
-    <main className="appShell">
-      <header className="topbar"><Brand /><div className="headerActions"><a id="sagitario-admin-v4" className="adminButton desktopAdminLink" href={ADMIN_URL} target="_self" aria-label="Abrir administração do Sagitário"><span aria-hidden="true">⚙</span> Admin</a><button className="secondaryButton" onClick={clearSelection}>Limpar seleção</button></div></header>
+    <main className="appShell" data-ui="saas-v4">
+      <header className="topbar"><div className="brandCluster"><Brand /><span className="brandDescriptor">Propostas comerciais</span></div><div className="headerActions"><div className="selectionStatus" aria-live="polite"><span>Selecionados</span><strong>{selectedServices.length}</strong></div><a id="sagitario-admin-v4" className="adminButton desktopAdminLink" href={ADMIN_URL} target="_self" aria-label="Abrir administração do Sagitário"><span aria-hidden="true">⚙</span> Admin</a><button className="secondaryButton" onClick={clearSelection}>Limpar seleção</button></div></header>
+      <section className="welcomePanel" aria-labelledby="welcome-title"><div className="welcomeCopy"><span className="welcomeEyebrow">SAGITÁRIO · PROPOSTA RÁPIDA</span><h1 id="welcome-title">Escolha os serviços<br className="desktopOnly" /> para começar.</h1><p>Marque os itens que você precisa e acompanhe o valor da proposta em tempo real.</p></div><div className="welcomeMeta" aria-label="Etapas da proposta"><div><strong>01</strong><span>Nicho</span></div><div><strong>02</strong><span>Serviços</span></div><div><strong>03</strong><span>Revisão</span></div></div></section>
       {validationMessage && <div className="validationBanner" role="alert">{validationMessage}</div>}
       <section className="nicheSection" aria-labelledby="niche-title"><div><span className="stepNumber">01</span><div><h2 id="niche-title">Escolha o nicho</h2><p>Os serviços disponíveis se adaptam à escolha.</p></div></div><div className="nicheButtons" role="group" aria-label="Nichos">{catalog.niches.map((niche) => <button key={niche.id} onClick={() => changeNiche(niche.id)} className={niche.id === nicheId ? "active" : ""}>{niche.name}</button>)}</div></section>
       <nav className="mobileQuickNav" aria-label="Atalhos da proposta"><a href="#services">Serviços <b>{selectedServices.length}</b></a><a href="#comparison">Comparar</a><a id="sagitario-admin-mobile-v4" className="adminQuickLink" href={ADMIN_URL} target="_self" aria-label="Abrir administração do Sagitário">⚙ Admin</a></nav>

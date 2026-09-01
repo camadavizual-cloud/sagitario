@@ -9,11 +9,22 @@ type Service = { id: string; niche_id: string; name: string; description: string
 type AdminCatalog = { niches: Niche[]; services: Service[] };
 type SeedSummary = { addedServices?: number };
 type Resource = keyof AdminCatalog;
+type JsonObject = Record<string, unknown>;
 
 const blankNiche: Omit<Niche, "id"> = { name: "", slug: "", description: "", active: true };
 const blankService: Omit<Service, "id"> = { niche_id: "", name: "", description: "", unit: "unidade", billing_type: "one_time", price: 0, default_quantity: 1, min_quantity: 1, max_quantity: null, active: true };
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const slugify = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const textValue = (value: unknown, fallback = "") => typeof value === "string" && value.trim() ? value : fallback;
+const listValue = <T extends object>(value: unknown): T[] => Array.isArray(value)
+  ? value.filter((item): item is T => Boolean(item && typeof item === "object"))
+  : [];
+const sortedNamedList = <T extends { name?: unknown }>(value: unknown): T[] => listValue<T>(value)
+  .sort((left, right) => textValue(left.name).localeCompare(textValue(right.name), "pt-BR"));
+async function readJson(response: Response): Promise<JsonObject> {
+  const value = await response.json().catch(() => null);
+  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : {};
+}
 
 function Brand() {
   return <Link href="/" className="adminBrand" aria-label="Voltar ao Sagitário"><Image src="/sagitario-full-logo.png" alt="Sagitário" width={1994} height={789} priority /></Link>;
@@ -35,21 +46,21 @@ export default function AdminPage() {
     setLoading(true); setError("");
     try {
       const response = await fetch("/api/admin/catalog", { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readJson(response);
       if (response.status === 401) { setSession("login"); return; }
-      if (!response.ok) throw new Error(payload.message || "Não foi possível carregar os cadastros.");
+      if (!response.ok) throw new Error(textValue(payload.message, "Não foi possível carregar os cadastros."));
       setCatalog({
-        niches: [...payload.niches].sort((a: Niche,b: Niche) => a.name.localeCompare(b.name)),
-        services: [...payload.services].sort((a: Service,b: Service) => a.name.localeCompare(b.name)),
+        niches: sortedNamedList<Niche>(payload.niches),
+        services: sortedNamedList<Service>(payload.services),
       });
-      const seeded = payload.seeded as SeedSummary | undefined;
+      const seeded = payload.seeded && typeof payload.seeded === "object" ? payload.seeded as SeedSummary : undefined;
       if (seeded?.addedServices) setMessage(`${seeded.addedServices} serviços de Clínicas foram adicionados ao catálogo.`);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Falha ao carregar."); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
-    fetch("/api/admin/session", { cache: "no-store" }).then((response) => response.json()).then((payload) => {
+    fetch("/api/admin/session", { cache: "no-store" }).then(readJson).then((payload) => {
       setConfigured(Boolean(payload.configured));
       setSession(payload.authenticated ? "ready" : "login");
       if (payload.authenticated) void loadCatalog();
@@ -59,9 +70,9 @@ export default function AdminPage() {
   const login = async (event: FormEvent) => {
     event.preventDefault(); setLoading(true); setError("");
     const response = await fetch("/api/admin/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
-    const payload = await response.json();
+    const payload = await readJson(response);
     setLoading(false);
-    if (!response.ok) { setError(payload.message || "Não foi possível entrar."); return; }
+    if (!response.ok) { setError(textValue(payload.message, "Não foi possível entrar.")); return; }
     setPassword(""); setSession("ready"); void loadCatalog();
   };
 
@@ -78,8 +89,8 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resource, id, data }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || "Não foi possível salvar.");
+      const payload = await readJson(response);
+      if (!response.ok) throw new Error(textValue(payload.message, "Não foi possível salvar."));
       setMessage(id ? "Alteração salva." : "Cadastro adicionado.");
       if (resource === "niches") setNicheForm({ ...blankNiche });
       if (resource === "services") setServiceForm({ ...blankService });
@@ -107,8 +118,8 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resource, id: item.id }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || "Não foi possível apagar.");
+      const payload = await readJson(response);
+      if (!response.ok) throw new Error(textValue(payload.message, "Não foi possível apagar."));
       setMessage("Cadastro apagado permanentemente.");
       if (resource === "niches" && nicheForm.id === item.id) setNicheForm({ ...blankNiche });
       if (resource === "services" && serviceForm.id === item.id) setServiceForm({ ...blankService });
@@ -122,7 +133,7 @@ export default function AdminPage() {
   if (session === "checking") return <main className="adminState"><div className="loader" /><p>Verificando acesso…</p></main>;
   if (session === "login") return <main className="adminLoginPage"><section className="adminLoginCard"><Brand /><span className="adminEyebrow">Área restrita</span><h1>Administração</h1><p>Gerencie os serviços exibidos no montador.</p>{!configured ? <div className="adminSetupNotice"><strong>Configuração necessária</strong><span>Cadastre a variável <code>ADMIN_PASSWORD</code> na Hostinger e reimplante o Site.</span></div> : <form onSubmit={login}><label>Senha administrativa<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label><button className="primaryButton" disabled={loading}>{loading ? "Entrando…" : "Entrar"}</button></form>}{error && <p className="adminError" role="alert">{error}</p>}<Link href="/" className="adminBackLink">← Voltar ao montador</Link></section></main>;
 
-  return <main className="adminShell">
+  return <main className="adminShell" data-admin-build="niches-services-v4">
     <header className="adminTopbar"><Brand /><div className="adminHeaderActions"><Link href="https://sagitario.camadavisual.com.br/" className="secondaryButton adminLinkButton">Abrir montador</Link><button className="adminLogout" onClick={logout}>Sair</button></div></header>
     <section className="adminIntro"><div><span className="adminEyebrow">Sagitário</span><h1>Administração</h1><p>Cadastre e organize o catálogo usado nas propostas.</p></div><div className="adminCounts"><span><b>{catalog.niches.length}</b> nichos</span><span><b>{catalog.services.length}</b> serviços</span></div></section>
     <nav className="adminTabs" aria-label="Seções administrativas">

@@ -4,14 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-type Niche = { id: string; name: string; slug: string; active: boolean };
+type Niche = { id: string; name: string; slug: string; description?: string; active: boolean };
 type Category = { id: string; niche_id: string; name: string; sort_order: number; active: boolean };
 type Service = { id: string; niche_id: string; category_id: string; name: string; description: string; unit: string; billing_type: "monthly" | "one_time" | "setup"; price: number; default_quantity: number; min_quantity: number; max_quantity: number | null; active: boolean };
 type AdminCatalog = { niches: Niche[]; categories: Category[]; services: Service[] };
 type SeedSummary = { addedServices?: number };
 type Resource = keyof AdminCatalog;
 
-const blankNiche: Omit<Niche, "id"> = { name: "", slug: "", active: true };
+const blankNiche: Omit<Niche, "id"> = { name: "", slug: "", description: "", active: true };
 const blankCategory: Omit<Category, "id"> = { niche_id: "", name: "", sort_order: 0, active: true };
 const blankService: Omit<Service, "id"> = { niche_id: "", category_id: "", name: "", description: "", unit: "unidade", billing_type: "one_time", price: 0, default_quantity: 1, min_quantity: 1, max_quantity: null, active: true };
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -123,8 +123,8 @@ export default function AdminPage() {
     finally { setLoading(false); }
   };
 
-  const categoriesForService = useMemo(() => catalog.categories.filter((category) => !serviceForm.niche_id || category.niche_id === serviceForm.niche_id), [catalog.categories, serviceForm.niche_id]);
-  const nicheName = (id: string) => catalog.niches.find((item) => item.id === id)?.name || "Nicho não encontrado";
+  const categoriesForService = useMemo(() => catalog.categories.filter((category) => !serviceForm.niche_id || !category.niche_id || category.niche_id === serviceForm.niche_id), [catalog.categories, serviceForm.niche_id]);
+  const nicheName = (id: string) => id ? (catalog.niches.find((item) => item.id === id)?.name || "Nicho não encontrado") : "Global";
   const categoryName = (id: string) => catalog.categories.find((item) => item.id === id)?.name || "Sem categoria";
 
   if (session === "checking") return <main className="adminState"><div className="loader" /><p>Verificando acesso…</p></main>;
@@ -146,7 +146,7 @@ export default function AdminPage() {
     </section>}
 
     {section === "categories" && <section className="adminWorkspace">
-      <form className="adminForm" onSubmit={(event) => { event.preventDefault(); void save("categories", categoryForm, categoryForm.id); }}><div className="adminFormTitle"><div><span>Cadastro</span><h2>{categoryForm.id ? "Editar categoria" : "Nova categoria"}</h2></div>{categoryForm.id && <button type="button" onClick={() => setCategoryForm({ ...blankCategory })}>Cancelar</button>}</div><label>Nicho<select required value={categoryForm.niche_id} onChange={(event) => setCategoryForm((current) => ({ ...current, niche_id: event.target.value }))}><option value="">Selecione</option>{catalog.niches.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Nome<input required value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} /></label><label>Ordem<input type="number" min="0" value={categoryForm.sort_order} onChange={(event) => setCategoryForm((current) => ({ ...current, sort_order: Number(event.target.value) }))} /></label><label className="adminCheck"><input type="checkbox" checked={categoryForm.active} onChange={(event) => setCategoryForm((current) => ({ ...current, active: event.target.checked }))} /> Ativa</label><button className="primaryButton" disabled={loading}>{categoryForm.id ? "Salvar alterações" : "Adicionar categoria"}</button></form>
+      <form className="adminForm" onSubmit={(event) => { event.preventDefault(); void save("categories", categoryForm, categoryForm.id); }}><div className="adminFormTitle"><div><span>Cadastro</span><h2>{categoryForm.id ? "Editar categoria" : "Nova categoria"}</h2></div>{categoryForm.id && <button type="button" onClick={() => setCategoryForm({ ...blankCategory })}>Cancelar</button>}</div><label>Nicho (opcional)<select value={categoryForm.niche_id} onChange={(event) => setCategoryForm((current) => ({ ...current, niche_id: event.target.value }))}><option value="">Global / não vinculado</option>{catalog.niches.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label>Nome<input required value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} /></label><label>Ordem<input type="number" min="0" value={categoryForm.sort_order} onChange={(event) => setCategoryForm((current) => ({ ...current, sort_order: Number(event.target.value) }))} /></label><label className="adminCheck"><input type="checkbox" checked={categoryForm.active} onChange={(event) => setCategoryForm((current) => ({ ...current, active: event.target.checked }))} /> Ativa</label><button className="primaryButton" disabled={loading}>{categoryForm.id ? "Salvar alterações" : "Adicionar categoria"}</button></form>
       <div className="adminList"><div className="adminListHeader"><h2>Categorias</h2><span>{catalog.categories.length} cadastradas</span></div>{catalog.categories.map((item) => <article className={!item.active ? "adminRow inactive" : "adminRow"} key={item.id}><div><h3>{item.name}</h3><p>{nicheName(item.niche_id)} · Ordem {item.sort_order}</p></div><span className={item.active ? "status active" : "status"}>{item.active ? "Ativa" : "Inativa"}</span><div className="adminRowActions"><button onClick={() => setCategoryForm({ ...item })}>Editar</button><button onClick={() => void toggleActive("categories", item)}>{item.active ? "Desativar" : "Ativar"}</button><button className="dangerAction" onClick={() => void remove("categories", item)}>Apagar</button></div></article>)}</div>
     </section>}
 

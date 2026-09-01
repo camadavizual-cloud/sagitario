@@ -39,18 +39,19 @@ const aliases: Record<Resource, Record<string, string[]>> = {
     id: ["id", "uuid", "niche_id", "nicho_id", "codigo"],
     name: ["name", "nome", "title", "titulo", "título"],
     slug: ["slug", "identificador", "chave"],
+    description: ["description", "descricao", "descrição", "details"],
     active: ["active", "ativo", "is_active"],
   },
   categories: {
     id: ["id", "uuid", "category_id", "categoria_id", "codigo"],
-    niche_id: ["niche_id", "nicho_id", "segment_id"],
+    niche_id: ["niche_id", "nicho_id", "segment_id", "niche_ids", "nicho_ids"],
     name: ["name", "nome", "title", "titulo", "título"],
     sort_order: ["sort_order", "order", "ordem", "position", "posicao", "posição"],
     active: ["active", "ativo", "is_active"],
   },
   services: {
     id: ["id", "uuid", "service_id", "servico_id", "serviço_id", "codigo"],
-    niche_id: ["niche_id", "nicho_id", "segment_id"],
+    niche_id: ["niche_id", "nicho_id", "segment_id", "niche_ids", "nicho_ids"],
     category_id: ["category_id", "categoria_id"],
     name: ["name", "nome", "title", "titulo", "título"],
     description: ["description", "commercial_description", "descricao", "descrição", "resumo", "short_description"],
@@ -85,8 +86,10 @@ function billing(input: unknown): "monthly" | "one_time" | "setup" {
   return "one_time";
 }
 
-function sourceColumn(resource: Resource, canonical: string, sample: Row) {
-  return (aliases[resource][canonical] || [canonical]).find((key) => Object.prototype.hasOwnProperty.call(sample, key));
+function sourceColumn(resource: Resource, canonical: string, sample: Row, availableColumns?: ReadonlySet<string>) {
+  return (aliases[resource][canonical] || [canonical]).find((key) => (
+    Object.prototype.hasOwnProperty.call(sample, key) || availableColumns?.has(key)
+  ));
 }
 
 export function normalizeAdminRows(resource: Resource, rows: Row[], fallbackNicheId = "") {
@@ -98,11 +101,15 @@ export function normalizeAdminRows(resource: Resource, rows: Row[], fallbackNich
         id,
         name,
         slug: asText(raw(resource, row, "slug")) || slugify(name),
+        description: asText(raw(resource, row, "description")),
         active: asActive(raw(resource, row, "active")),
       };
     }
     const nicheValue = raw(resource, row, "niche_id");
-    const nicheFromArray = Array.isArray(row.niche_ids) ? asText(row.niche_ids[0]) : Array.isArray(row.nicho_ids) ? asText(row.nicho_ids[0]) : "";
+    const nicheFromArray = Array.isArray(row.niche_ids) ? asText(row.niche_ids[0])
+      : Array.isArray(row.nicho_ids) ? asText(row.nicho_ids[0])
+        : Array.isArray(row.segments) ? asText(row.segments[0])
+          : Array.isArray(row.nichos) ? asText(row.nichos[0]) : "";
     const niche_id = asText(nicheValue) || nicheFromArray || fallbackNicheId;
     if (resource === "categories") {
       return {
@@ -132,18 +139,21 @@ export function normalizeAdminRows(resource: Resource, rows: Row[], fallbackNich
   });
 }
 
-export function mapPayloadToSource(resource: Resource, payload: Row, sample: Row) {
-  if (!Object.keys(sample).length) return payload;
+export function mapPayloadToSource(resource: Resource, payload: Row, sample: Row, availableColumns?: ReadonlySet<string>) {
+  if (!Object.keys(sample).length && !availableColumns?.size) return payload;
   const mapped: Row = {};
   for (const [canonical, input] of Object.entries(payload)) {
-    const column = sourceColumn(resource, canonical, sample);
-    if (column) mapped[column] = input;
+    const column = sourceColumn(resource, canonical, sample, availableColumns);
+    if (column) {
+      const arrayRelation = canonical === "niche_id" && (column.endsWith("_ids") || Array.isArray(sample[column]));
+      mapped[column] = arrayRelation ? (input ? [input] : []) : input;
+    }
   }
   return mapped;
 }
 
-export function sourceIdColumn(resource: Resource, sample: Row) {
-  return sourceColumn(resource, "id", sample) || "id";
+export function sourceIdColumn(resource: Resource, sample: Row, availableColumns?: ReadonlySet<string>) {
+  return sourceColumn(resource, "id", sample, availableColumns) || "id";
 }
 
 export function cleanAdminPayload(resource: Resource, data: Row) {
@@ -152,6 +162,7 @@ export function cleanAdminPayload(resource: Resource, data: Row) {
     return {
       name: asText(data.name),
       slug: asText(data.slug),
+      description: asText(data.description),
       active,
     };
   }

@@ -23,29 +23,29 @@ const ADMIN_URL = "https://sagitario.camadavisual.com.br/admin?origem=montador-v
 const MONTHLY_PLAN_RATE = 0.4;
 const contractSections: ContractSection[] = [
   { title: "Observações", paragraphs: [
-    "Disponibilidade para produção externa do material de acordo com o que está descrito no plano contratado, com duração de duas horas de produção.",
-    "Após esse período, a continuidade da produção do material no local deverá ser acordada entre as partes, ficando a decisão a critério da contratada, assim como o tempo necessário.",
-    "O plano contratado tem prazo indeterminado e entende-se por renovação automática. Para realizar o cancelamento, é necessário avisar com 30 (trinta) dias de antecedência; caso contrário, haverá renovação automática até que uma das partes decida pela rescisão imotivada.",
-    "Observação 1: a rescisão em prazo inferior a 30 (trinta) dias enseja o pagamento mensal integral, independentemente de qualquer circunstância.",
-    "Observação 2: o contrato não tem pausa ou interrupção por férias, viagem, passeio ou qualquer outro motivo, devendo ser paga a quantia acordada no presente contrato.",
+    "Disponibilidade para produção (externa) do material é de acordo com o que está descrito no plano que o cliente contratou, tendo duração de duas horas de produção.",
+    "Após o prazo de duração acima, deve ser acordado entre as partes a continuidade da produção do material no local, decisão que ficará a critério da contratada, assim como o tempo necessário.",
+    "O plano contratado tem prazo indeterminado, entende-se por renovação automática, logo para realizar o cancelamento é necessário avisar com 30 (trinta) dias de antecedência, caso contrário entende-se pela renovação automática, independentemente de férias do contratante ou algo relacionado, até que uma das partes decida pela rescisão de forma imotivada.",
+    "¹ºObs.: A rescisão em prazo inferior a 30 (trinta) dias enseja o pagamento mensal integral, independentemente de qualquer circunstância.",
+    "²ºObs.: O contrato não tem pausa ou interrupção por férias, viagem, passeio ou qualquer outro motivo, sendo indiferente para a contratada, devendo ser pago a quantia acordada no presente contrato.",
   ] },
   { title: "Observações contratuais", items: [
-    "O 1º mês de contrato será utilizado para captação e produção dos materiais para uso nas redes sociais da empresa ou marca do cliente, podendo ser reduzido para 15 dias úteis o prazo para início das postagens.",
-    "Ressalte-se que o material captado e produzido que não foi postado é de propriedade da produtora e não faz parte do plano. A eventual aquisição desse material poderá ser negociada posteriormente entre as partes, mediante acordo específico sobre condições e valores. Caso o material ainda não tenha sido editado, ele poderá ser enviado ao cliente em arquivo bruto, conforme ajustado entre as partes.",
-    "O material já postado pode ser solicitado para uso pessoal ou comercial pelo cliente dentro do prazo do contrato; após isso, deve ser observada a cláusula 13.",
-    "A produtora se compromete a não criar, desenvolver ou utilizar fotos ou vídeos que distorçam a realidade do produto apresentado. A finalidade desse compromisso é eliminar a necessidade do uso da expressão imagem meramente ilustrativa.",
-    "O cliente deve fornecer os materiais indispensáveis ao serviço e aprovar os posts, quando entregues, em tempo hábil. Se o processo de captação e produção for atrasado por falta de suporte do cliente, a produtora fica isenta da responsabilidade de entrega nos prazos do plano, sem prejuízo do valor da mensalidade.",
-    "O contratante tem a responsabilidade de designar uma pessoa autorizada para aprovar os materiais produzidos, garantindo uma avaliação eficiente e sem comprometer o processo de entrega.",
-    "É liberado o uso do material captado e produzido como portfólio da produtora, respeitando sempre a integridade da marca.",
+    "O 1º mês de contrato será utilizado para captação e produção dos materiais para uso nas redes sociais da empresa/marca do cliente, podendo ser reduzido para 15 dias úteis o prazo para início das postagens;",
+    "Ressalte-se que o material captado e produzido que não foi postado é de propriedade da produtora e não faz parte do plano. A eventual aquisição desse material poderá ser negociada posteriormente entre as partes, mediante acordo específico sobre condições e valores. Caso o material ainda não tenha sido editado, ele será enviado ao cliente em arquivo bruto, conforme ajustado entre as partes;",
+    "O material já postado pode ser solicitado para uso pessoal ou comercial pelo cliente dentro do prazo do contrato, após isso deve ser observada a cláusula 13.",
+    "A produtora se compromete a não criar, desenvolver ou utilizar fotos ou vídeos que distorçam a realidade do produto apresentado. A finalidade desse compromisso é eliminar a necessidade do uso da expressão \"imagem meramente ilustrativa\".",
+    "O cliente deve fornecer os materiais indispensáveis ao serviço, aprovando os posts, quando entregues, em tempo hábil. Se o processo de captação e produção do material for atrasado por falta de suporte do cliente, a produtora isenta-se da responsabilidade de entrega nos prazos do plano, sem prejuízo ao valor da mensalidade do plano;",
+    "O contratante tem a responsabilidade de designar uma pessoa autorizada para aprovar os materiais produzidos. Essa designação tem o propósito de garantir uma avaliação e aprovação eficientes dos materiais, visando a não comprometer o processo de entrega dentro dos prazos estabelecidos.",
+    "É liberado o uso do material captado e produzido, como portfólio da produtora, respeitando sempre a integridade da marca.",
   ] },
   { title: "Observações contratuais (continuação)", items: [
     "Qualquer captação que não se enquadre nos itens da cobertura do plano é serviço não incluso e deverá ter valor acordado entre as partes.",
-    "É dado ao cliente o direito de solicitar 1 reunião por mês, exclusivamente online, com duração de até 30 (trinta) minutos, sujeita à disponibilidade da produtora.",
-    "Prestamos serviço para a empresa na cidade onde ela está localizada. Externas em outras cidades deverão ter disponibilidade consultada pela produtora e o translado será pago pelo cliente.",
+    "É dado ao cliente o direito de solicitar 1 reunião por mês, exclusivamente online, com duração de até 30 (trinta) minutos, a reunião fica sujeita à disponibilidade da produtora.",
+    "Prestamos serviço para a empresa na cidade onde ela está localizada. (Externas em outras cidades deverão ter disponibilidade consultada pela produtora e o translado pago pelo cliente).",
     "A realização de uma captação adicional está sujeita à disponibilidade da produtora e ao pagamento de uma taxa de externa adicional equivalente a 50% do valor do plano.",
-    "A produtora, ora contratada, não possui obrigatoriedade de se fazer presente nas instalações do contratante ou em qualquer espaço deste de forma mensal, comprometendo-se a estar disponível no dia e hora previamente marcados para realização da produção.",
-    "Após o fim dos serviços contratados, será enviado um link de acesso ao material utilizado e postado nas redes sociais, que ficará disponível por 7 (sete) dias corridos a partir do envio pelo grupo de WhatsApp. Após esse prazo, sem aviso, o link estará indisponível e a contratada não terá responsabilidade de reenvio ou guarda desse material.",
-    "A Lei Geral de Proteção de Dados, conhecida como LGPD, será respeitada em todos os seus termos pela contratada e pela contratante, obrigando as partes a tratarem os dados eventualmente coletados conforme sua necessidade ou obrigatoriedade.",
+    "A produtora, ora contratada, não possui obrigatoriedade de se fazer presente nas instalações do Contratante ou qualquer espaço deste de forma mensal. Comprometendo-se a estar disponível no dia e hora, previamente marcado, para realização da produção (também conhecido como externa).",
+    "Após o fim dos serviços contratados, será enviado um link de acesso ao material utilizado e postado nas redes sociais, este ficará disponível por 7 (sete) dias corridos, a partir do envio deste link pelo grupo de WhatsApp. Após esse prazo, sem aviso, o link estará indisponível, independente de qualquer outra notificação, não tendo mais a contratada responsabilidade de reenvio ou guarda desse material.",
+    "A Lei Geral de Proteção de Dados, conhecida como LGPD, será respeitada, em todos os seus termos, pela contratada, como também pela contratante, obrigando-se, as partes, a tratarem os dados que forem eventualmente coletados, conforme sua necessidade ou obrigatoriedade, observando os liames da presente.",
   ] },
 ];
 const deliveryDeadlines = [
@@ -54,7 +54,7 @@ const deliveryDeadlines = [
   ["Alteração do banner", "1 dia útil"],
   ["Material de design off", "10 dias úteis"],
   ["Vídeo", "7 dias úteis"],
-  ["Alteração do vídeo", "3 dias úteis (até 1 alteração por vídeo)"],
+  ["Alteração do vídeo", "3 dias úteis (Obs.: Até 1 alteração por vídeo)"],
 ] as const;
 const listValue = <T extends object>(value: unknown): T[] => Array.isArray(value)
   ? value.filter((item): item is T => Boolean(item && typeof item === "object"))

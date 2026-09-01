@@ -1241,20 +1241,11 @@ body { font-family: "Montserrat", ui-sans-serif, system-ui, -apple-system, Blink
   }
   .contractPageContent { position: relative; z-index: 1; }
   .contractMasthead {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 20px;
     margin-bottom: 17mm;
     padding-bottom: 6mm;
     border-bottom: 1px solid #cfd0d0;
   }
-  .contractMasthead>div { display: flex; flex-direction: column; gap: 2px; }
-  .contractMasthead>div:nth-child(2) { align-items: flex-end; text-align: right; }
-  .contractMasthead strong { font-size: 10pt; }
-  .contractMasthead span { color: #666; font-size: 8pt; }
-  .contractMasthead h2 { grid-column: 1 / -1; margin: 9mm 0 0; color: #202020; font-size: 18pt; letter-spacing: .05em; text-align: center; }
-  .contractMark { display: none !important; }
+  .contractMasthead h2 { margin: 0; color: #202020; font-size: 18pt; letter-spacing: .05em; text-align: center; }
   .contractPage h3 { margin: 0 0 10px; color: #222; font-size: 12pt; letter-spacing: .01em; }
   .contractPage p { margin: 0 0 9px; }
   .contractClient { display: grid; gap: 3px; margin: 0 0 15mm; padding: 11px 13px; border-left: 3px solid #272727; background: rgba(245,245,245,.88); }
@@ -1270,7 +1261,6 @@ body { font-family: "Montserrat", ui-sans-serif, system-ui, -apple-system, Blink
   .contractThanks { margin-top: 24mm; padding-top: 12mm; border-top: 1px solid #bbb; text-align: center; }
   .contractThanks strong { display: block; font-size: 18pt; }
   .contractThanks p { margin: 6px auto 0; max-width: 110mm; color: #666; }
-  .contractContacts { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 22px; margin-top: 16mm; color: #555; font-size: 8.5pt; }
 }
 
 /* The service list shows the unit price and quantity control only. */

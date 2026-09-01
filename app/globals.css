@@ -1215,3 +1215,21 @@ body { font-family: "Montserrat", ui-sans-serif, system-ui, -apple-system, Blink
 @media (max-width: 820px) {
   .proposalFields { grid-template-columns: 1fr; }
 }
+
+/* The service list shows the unit price and quantity control only. */
+[data-ui="saas-v4"] .serviceRow {
+  grid-template-columns: 31px minmax(0, 1fr) 108px;
+  grid-template-rows: minmax(76px, 1fr);
+}
+[data-ui="saas-v4"] .serviceInfo { grid-column: 2; grid-row: 1; }
+[data-ui="saas-v4"] .quantityControl { grid-column: 3; grid-row: 1; align-self: center; }
+[data-ui="saas-v4"] .subtotal { display: none; }
+
+@media (max-width: 820px) {
+  [data-ui="saas-v4"] .serviceRow {
+    grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-rows: minmax(72px, 1fr) auto;
+  }
+  [data-ui="saas-v4"] .serviceInfo { grid-column: 2; grid-row: 1; }
+  [data-ui="saas-v4"] .quantityControl { grid-column: 2; grid-row: 2; align-self: center; }
+}

@@ -100,7 +100,7 @@ export async function GET() {
     const companyRow = companyRows.find(active) || null;
     const company = companyRow ? { name: text(companyRow, "name", "nome", "company_name", "razao_social") || "Frame Rec", logoUrl: text(companyRow, "logo_url", "logo", "brand_logo_url") || null, document: text(companyRow, "document", "cnpj"), email: text(companyRow, "email", "contact_email"), phone: text(companyRow, "phone", "telefone", "whatsapp"), address: text(companyRow, "address", "endereco") } : null;
 
-    return NextResponse.json({ niches, services, company }, { headers: { "Cache-Control": "no-store", "X-Sagitario-Build": "niches-services-v1", "X-Sagitario-Niche-Columns": Object.keys(nicheRows[0] || {}).sort().join(","), "X-Sagitario-Service-Columns": Object.keys(serviceRows[0] || {}).sort().join(",") } });
+    return NextResponse.json({ niches, services, company }, { headers: { "Cache-Control": "no-store", "X-Sagitario-Build": "niches-services-v2-clean", "X-Sagitario-Niche-Columns": Object.keys(nicheRows[0] || {}).sort().join(","), "X-Sagitario-Service-Columns": Object.keys(serviceRows[0] || {}).sort().join(",") } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao ler o catálogo do Supabase.";
     const invalidKey = /invalid api key/i.test(message);
@@ -114,7 +114,7 @@ export async function GET() {
         status: 502,
         headers: {
           "Cache-Control": "no-store",
-          "X-Sagitario-Build": "supabase-key-normalization-v2",
+          "X-Sagitario-Build": "supabase-key-normalization-v3",
         },
       },
     );

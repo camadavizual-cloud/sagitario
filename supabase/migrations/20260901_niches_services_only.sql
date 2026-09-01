@@ -94,6 +94,27 @@ BEGIN
   END IF;
 END $$;
 
+-- Legacy services tables often required category_id. Keep that column only as
+-- historical compatibility, but allow new two-level records to omit it.
+DO $$
+DECLARE
+  legacy_category_column text;
+BEGIN
+  SELECT a.attname INTO legacy_category_column
+  FROM pg_attribute a
+  JOIN pg_class c ON c.oid = a.attrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND c.relname = 'services'
+    AND a.attname IN ('category_id', 'categoria_id')
+    AND a.attisdropped = false
+  ORDER BY a.attnum
+  LIMIT 1;
+
+  IF legacy_category_column IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.services ALTER COLUMN %I DROP NOT NULL', legacy_category_column);
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS services_niche_id_idx ON public.services (niche_id);
 
 -- Add referential integrity when the existing id types and data allow it.

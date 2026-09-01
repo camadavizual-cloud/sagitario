@@ -1217,10 +1217,11 @@ body { font-family: "Montserrat", ui-sans-serif, system-ui, -apple-system, Blink
 }
 
 @media print {
-  .contractPage {
+  .printProposal .contractPage {
     position: relative;
+    height: calc(297mm - 28mm);
     min-height: calc(297mm - 28mm);
-    margin: 0;
+    margin: 0 !important;
     padding: 29mm 19mm 25mm;
     overflow: hidden;
     color: #282828;

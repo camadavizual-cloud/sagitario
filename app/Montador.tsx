@@ -15,7 +15,9 @@ type JsonObject = Record<string, unknown>;
 const initialConditions: Conditions = { client:"", responsible:"", email:"", phone:"", validity:"15 dias", start:"", term:"3 meses", payment:"Pix ou boleto", dueDay:"10", notes:"" };
 const currency = new Intl.NumberFormat("pt-BR", { style:"currency", currency:"BRL" });
 const formatMoney = (value: number) => currency.format(Number.isFinite(value) ? value : 0);
-const ADMIN_URL = "https://sagitario.camadavisual.com.br/admin?origem=montador-v4";
+// Keep this destination absolute and versioned so a browser or edge cache
+// cannot reuse the former Produframe administration link.
+const ADMIN_URL = "https://sagitario.camadavisual.com.br/admin?origem=montador-v5&build=8b91dd8";
 const MONTHLY_PLAN_RATE = 0.4;
 const listValue = <T extends object>(value: unknown): T[] => Array.isArray(value)
   ? value.filter((item): item is T => Boolean(item && typeof item === "object"))

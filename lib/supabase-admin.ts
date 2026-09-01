@@ -1,4 +1,4 @@
-type Resource = "niches" | "categories" | "services";
+type Resource = "niches" | "services";
 type Row = Record<string, unknown>;
 
 const cleanEnv = (input?: string) => input?.trim().replace(/^(["'])(.*)\1$/, "$2").trim();
@@ -13,7 +13,6 @@ export function getSupabaseAdminConfig() {
   const schema = cleanEnv(process.env.SUPABASE_SCHEMA) || "public";
   const tables: Record<Resource, string> = {
     niches: cleanEnv(process.env.SUPABASE_NICHES_TABLE) || "niches",
-    categories: cleanEnv(process.env.SUPABASE_CATEGORIES_TABLE) || "categories",
     services: cleanEnv(process.env.SUPABASE_SERVICES_TABLE) || "services",
   };
   return { url, key, schema, tables };
@@ -42,17 +41,9 @@ const aliases: Record<Resource, Record<string, string[]>> = {
     description: ["description", "descricao", "descrição", "details"],
     active: ["active", "ativo", "is_active"],
   },
-  categories: {
-    id: ["id", "uuid", "category_id", "categoria_id", "codigo"],
-    niche_id: ["niche_id", "nicho_id", "segment_id", "niche_ids", "nicho_ids"],
-    name: ["name", "nome", "title", "titulo", "título"],
-    sort_order: ["sort_order", "order", "ordem", "position", "posicao", "posição"],
-    active: ["active", "ativo", "is_active"],
-  },
   services: {
     id: ["id", "uuid", "service_id", "servico_id", "serviço_id", "codigo"],
     niche_id: ["niche_id", "nicho_id", "segment_id", "niche_ids", "nicho_ids"],
-    category_id: ["category_id", "categoria_id"],
     name: ["name", "nome", "title", "titulo", "título"],
     description: ["description", "commercial_description", "descricao", "descrição", "resumo", "short_description"],
     unit: ["unit", "unidade", "price_unit", "unidade_preco", "unidade_preço"],
@@ -111,21 +102,11 @@ export function normalizeAdminRows(resource: Resource, rows: Row[], fallbackNich
         : Array.isArray(row.segments) ? asText(row.segments[0])
           : Array.isArray(row.nichos) ? asText(row.nichos[0]) : "";
     const niche_id = asText(nicheValue) || nicheFromArray || fallbackNicheId;
-    if (resource === "categories") {
-      return {
-        id,
-        niche_id,
-        name,
-        sort_order: Math.max(0, asNumber(raw(resource, row, "sort_order"), 0)),
-        active: asActive(raw(resource, row, "active")),
-      };
-    }
     const minQuantity = Math.max(1, asNumber(raw(resource, row, "min_quantity"), 1));
     const maximum = raw(resource, row, "max_quantity");
     return {
       id,
       niche_id,
-      category_id: asText(raw(resource, row, "category_id")),
       name,
       description: asText(raw(resource, row, "description")),
       unit: asText(raw(resource, row, "unit")) || "unidade",
@@ -166,21 +147,12 @@ export function cleanAdminPayload(resource: Resource, data: Row) {
       active,
     };
   }
-  if (resource === "categories") {
-    return {
-      niche_id: asText(data.niche_id),
-      name: asText(data.name),
-      sort_order: Math.max(0, asNumber(data.sort_order, 0)),
-      active,
-    };
-  }
   const minQuantity = Math.max(1, asNumber(data.min_quantity, 1));
   const maxQuantity = data.max_quantity === null || data.max_quantity === "" || data.max_quantity === undefined
     ? null
     : Math.max(minQuantity, asNumber(data.max_quantity, minQuantity));
   return {
     niche_id: asText(data.niche_id),
-    category_id: asText(data.category_id),
     name: asText(data.name),
     description: asText(data.description),
     unit: asText(data.unit) || "unidade",

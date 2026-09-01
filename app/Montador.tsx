@@ -5,10 +5,9 @@ import Image from "next/image";
 
 type BillingType = "monthly" | "one_time" | "setup";
 type Niche = { id: string; name: string };
-type Category = { id: string; name: string; nicheId: string | null; order: number };
-type Service = { id: string; name: string; description: string; categoryId: string | null; nicheIds: string[]; unit: string; billingType: BillingType; price: number; defaultQuantity: number; minQuantity: number; maxQuantity: number | null };
+type Service = { id: string; name: string; description: string; nicheIds: string[]; unit: string; billingType: BillingType; price: number; defaultQuantity: number; minQuantity: number; maxQuantity: number | null };
 type Company = { name: string; logoUrl: string | null; document: string; email: string; phone: string; address: string };
-type Catalog = { niches: Niche[]; categories: Category[]; services: Service[]; company: Company | null };
+type Catalog = { niches: Niche[]; services: Service[]; company: Company | null };
 type Selection = Record<string, number>;
 type Conditions = { client: string; responsible: string; email: string; phone: string; validity: string; start: string; term: string; payment: string; dueDay: string; notes: string };
 
@@ -34,7 +33,6 @@ export default function Home() {
   const [nicheId, setNicheId] = useState("");
   const [selection, setSelection] = useState<Selection>({});
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [conditions, setConditions] = useState<Conditions>(initialConditions);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
@@ -65,11 +63,7 @@ export default function Home() {
   }, [reloadKey]);
 
   const servicesById = useMemo(() => new Map((catalog?.services || []).map((service) => [service.id, service])), [catalog]);
-  const nicheServices = useMemo(() => (catalog?.services || []).filter((service) => service.nicheIds.length === 0 || service.nicheIds.includes(nicheId)), [catalog, nicheId]);
-  const nicheCategories = useMemo(() => {
-    const used = new Set(nicheServices.map((service) => service.categoryId).filter(Boolean));
-    return (catalog?.categories || []).filter((category) => (!category.nicheId || category.nicheId === nicheId) && used.has(category.id)).sort((a,b) => a.order - b.order || a.name.localeCompare(b.name));
-  }, [catalog, nicheId, nicheServices]);
+  const nicheServices = useMemo(() => (catalog?.services || []).filter((service) => service.nicheIds.includes(nicheId)), [catalog, nicheId]);
   const selectedServices = useMemo(() => Object.entries(selection).map(([id, quantity]) => ({ service:servicesById.get(id), quantity })).filter((item): item is { service:Service; quantity:number } => Boolean(item.service)), [selection, servicesById]);
   const setupTotal = useMemo(() => selectedServices.reduce((sum, { service, quantity }) => service.billingType === "setup" ? sum + service.price * quantity : sum, 0), [selectedServices]);
   const serviceReferenceTotal = useMemo(() => selectedServices.reduce((sum, { service, quantity }) => service.billingType === "setup" ? sum : sum + service.price * quantity, 0), [selectedServices]);
@@ -78,15 +72,8 @@ export default function Home() {
   const filteredServices = useMemo(() => nicheServices.filter((service) => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     const matchesSearch = !query || `${service.name} ${service.description} ${service.unit}`.toLocaleLowerCase("pt-BR").includes(query);
-    return matchesSearch && (categoryFilter === "all" || service.categoryId === categoryFilter);
-  }), [nicheServices, search, categoryFilter]);
-
-  const groupedServices = useMemo(() => {
-    const groups = nicheCategories.map((category) => ({ category, services:filteredServices.filter((service) => service.categoryId === category.id) })).filter((group) => group.services.length);
-    const uncategorized = filteredServices.filter((service) => !service.categoryId || !nicheCategories.some((category) => category.id === service.categoryId));
-    if (uncategorized.length) groups.push({ category:{ id:"other", name:"Outros serviços", nicheId:null, order:999 }, services:uncategorized });
-    return groups;
-  }, [filteredServices, nicheCategories]);
+    return matchesSearch;
+  }), [nicheServices, search]);
 
   const setCondition = (field: keyof Conditions, value: string) => setConditions((current) => ({ ...current, [field]:value }));
   const toggleService = (service: Service) => {
@@ -100,15 +87,15 @@ export default function Home() {
   });
   const changeNiche = (nextNicheId: string) => {
     if (nextNicheId === nicheId) return;
-    const compatible = new Set((catalog?.services || []).filter((service) => service.nicheIds.length === 0 || service.nicheIds.includes(nextNicheId)).map((service) => service.id));
+    const compatible = new Set((catalog?.services || []).filter((service) => service.nicheIds.includes(nextNicheId)).map((service) => service.id));
     const incompatible = Object.keys(selection).filter((id) => !compatible.has(id));
     if (incompatible.length && !window.confirm("A mudança de nicho removerá serviços incompatíveis da seleção. Deseja continuar?")) return;
     setSelection((current) => Object.fromEntries(Object.entries(current).filter(([id]) => compatible.has(id))));
-    setNicheId(nextNicheId); setCategoryFilter("all"); setValidationMessage("");
+    setNicheId(nextNicheId); setValidationMessage("");
   };
   const clearSelection = () => {
     if (selectedServices.length && !window.confirm("Limpar todos os serviços e condições desta proposta?")) return;
-    setSelection({}); setConditions(initialConditions); setSearch(""); setCategoryFilter("all"); setValidationMessage("");
+    setSelection({}); setConditions(initialConditions); setSearch(""); setValidationMessage("");
   };
   const openReview = () => {
     if (!selectedServices.length) { setValidationMessage("Selecione pelo menos um serviço para gerar a proposta."); window.scrollTo({ top:0, behavior:"smooth" }); return; }
@@ -136,11 +123,11 @@ export default function Home() {
         <div className="mainColumn">
           <section className="sectionBlock servicesSection" id="services" aria-labelledby="services-title">
             <div className="sectionTitle"><span className="stepNumber">02</span><div><h2 id="services-title">Lista de serviços</h2><p>Marque, ajuste a quantidade e acompanhe o subtotal.</p></div></div>
-            <div className="filtersBar"><label className="searchField"><span className="srOnly">Pesquisar serviços</span><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar serviço" /></label><select aria-label="Filtrar por categoria" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Todas as categorias</option>{nicheCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
-            {groupedServices.length ? groupedServices.map(({ category, services }) => <div className="serviceGroup" key={category.id}><h3>{category.name}<span>{services.length}</span></h3><div className="serviceList">{services.map((service) => {
+            <div className="filtersBar"><label className="searchField"><span className="srOnly">Pesquisar serviços</span><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar serviço" /></label></div>
+            {filteredServices.length ? <div className="serviceGroup"><h3>{currentNiche?.name || "Serviços disponíveis"}<span>{filteredServices.length}</span></h3><div className="serviceList">{filteredServices.map((service) => {
               const checked = selection[service.id] !== undefined; const quantity = selection[service.id] ?? service.defaultQuantity;
               return <article key={service.id} className={checked ? "serviceRow selected" : "serviceRow"}><label className="checkWrap"><input type="checkbox" checked={checked} onChange={() => toggleService(service)} /><span className="customCheck" /></label><div className="serviceInfo" role="button" tabIndex={0} aria-pressed={checked} onClick={() => toggleService(service)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggleService(service); } }}><div className="serviceNameLine"><h4>{service.name}</h4>{service.billingType === "setup" && <span className="billingTag setup">Taxa inicial</span>}</div>{service.description && <p>{service.description}</p>}<small>{formatMoney(service.price)} por {service.unit}</small></div><div className="quantityControl" aria-label={`Quantidade de ${service.name}`}><button disabled={!checked || quantity <= service.minQuantity} onClick={() => changeQuantity(service,-1)} aria-label="Diminuir quantidade">−</button><output>{quantity}</output><button disabled={!checked || (service.maxQuantity !== null && quantity >= service.maxQuantity)} onClick={() => changeQuantity(service,1)} aria-label="Aumentar quantidade">+</button></div><div className="subtotal"><span>Subtotal</span><strong>{formatMoney(checked ? service.price * quantity : 0)}</strong></div></article>;
-            })}</div></div>) : <div className="emptyState"><strong>Nenhum serviço encontrado.</strong><span>Ajuste os filtros ou confira o cadastro deste nicho.</span></div>}
+            })}</div></div> : <div className="emptyState"><strong>Nenhum serviço encontrado.</strong><span>Ajuste a pesquisa ou confira o cadastro deste nicho.</span></div>}
           </section>
 
           <section className="sectionBlock comparisonSection" id="comparison" aria-labelledby="comparison-title">

@@ -12,7 +12,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const resources = new Set<AdminResource>(["niches", "categories", "services"]);
+const resources = new Set<AdminResource>(["niches", "services"]);
 
 function isResource(value: unknown): value is AdminResource {
   return resources.has(value as AdminResource);
@@ -26,6 +26,13 @@ async function readError(response: Response) {
     return "Não foi possível salvar a alteração.";
   }
 }
+
+function missingColumn(detail: string) {
+  return detail.match(/Could not find the ['"]([^'"]+)['"] column/i)?.[1] || null;
+}
+
+const nicheRelationColumns = new Set(["niche_id", "nicho_id", "segment_id", "niche_ids", "nicho_ids"]);
+const directNicheSchemaMessage = "Para usar apenas Nicho → Serviço, a tabela services precisa ter uma coluna niche_id (ou niche_ids) ligada à tabela niches. Execute a migração SQL fornecida nesta versão e tente novamente.";
 
 type AdminConfig = ReturnType<typeof getSupabaseAdminConfig> & { url: string; key: string };
 type ConfigResult =
@@ -75,7 +82,7 @@ const record = (value: unknown): Record<string, unknown> => (
 let schemaCache: { fingerprint: string; columns: ColumnMap } | null = null;
 
 function schemaFingerprint(config: AdminConfig) {
-  return [config.url, config.schema, config.tables.niches, config.tables.categories, config.tables.services].join("|");
+  return [config.url, config.schema, config.tables.niches, config.tables.services].join("|");
 }
 
 async function loadSchemaColumns(config: AdminConfig): Promise<ColumnMap> {
@@ -132,36 +139,47 @@ async function insertCatalogRow(
   // deployments. An empty table has no sample row for the normal mapper, so
   // keep a compatibility attempt for that schema without changing the
   // canonical admin model.
-  if (resource === "categories" && !Object.keys(sample).length && !availableColumns?.size) {
-    const withoutNiche = Object.fromEntries(Object.entries(canonical).filter(([key]) => key !== "niche_id"));
-    payloads.unshift(withoutNiche);
-  }
   if (resource === "services" && !Object.keys(sample).length && !availableColumns?.size) {
-    const { description, price, ...rest } = canonical;
-    const withoutNiche = Object.fromEntries(Object.entries(rest).filter(([key]) => key !== "niche_id"));
-    payloads.splice(1, 0, withoutNiche);
-    payloads.push({ ...withoutNiche, commercial_description: description, unit_price: price });
-    payloads.push({ ...withoutNiche, niche_ids: canonical.niche_id ? [canonical.niche_id] : [], commercial_description: description, unit_price: price });
-    payloads.push({ ...rest, commercial_description: description, unit_price: price });
+    const { description, price, niche_id, ...rest } = canonical;
+    payloads.push({ ...rest, niche_ids: niche_id ? [niche_id] : [], description, price });
+    payloads.push({ ...rest, niche_ids: niche_id ? [niche_id] : [], commercial_description: description, unit_price: price });
+    payloads.push({ ...rest, niche_id, commercial_description: description, unit_price: price });
+  }
+  if (resource === "services" && availableColumns?.size && ![...availableColumns].some((column) => nicheRelationColumns.has(column))) {
+    throw new Error(directNicheSchemaMessage);
   }
   const { url, key, schema, tables } = config;
   let lastError = "Não foi possível criar o cadastro.";
-  for (const candidate of payloads) {
-    const response = await fetch(url + "/rest/v1/" + encodeURIComponent(tables[resource]), {
-      method: "POST",
-      headers: supabaseHeaders(key, schema, true),
-      body: JSON.stringify(candidate),
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      lastError = await readError(response);
-      continue;
+  let missingNicheRelation = false;
+  for (const initialCandidate of payloads) {
+    const candidate = { ...initialCandidate };
+    for (let attempt = 0; attempt < 16; attempt += 1) {
+      const response = await fetch(url + "/rest/v1/" + encodeURIComponent(tables[resource]), {
+        method: "POST",
+        headers: supabaseHeaders(key, schema, true),
+        body: JSON.stringify(candidate),
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        lastError = await readError(response);
+        const column = /PGRST204/i.test(lastError) ? missingColumn(lastError) : null;
+        if (column && Object.prototype.hasOwnProperty.call(candidate, column)) {
+          if (resource === "services" && nicheRelationColumns.has(column)) {
+            missingNicheRelation = true;
+            break;
+          }
+          delete candidate[column];
+          continue;
+        }
+        break;
+      }
+      const returned = await response.json().catch(() => []);
+      const row = Array.isArray(returned) ? returned[0] : returned;
+      if (!row || typeof row !== "object") throw new Error("O Supabase não devolveu o cadastro criado.");
+      return row as Record<string, unknown>;
     }
-    const returned = await response.json().catch(() => []);
-    const row = Array.isArray(returned) ? returned[0] : returned;
-    if (!row || typeof row !== "object") throw new Error("O Supabase não devolveu o cadastro criado.");
-    return row as Record<string, unknown>;
   }
+  if (resource === "services" && missingNicheRelation) throw new Error(directNicheSchemaMessage);
   throw new Error(lastError);
 }
 
@@ -173,18 +191,38 @@ async function updateCatalogRow(
   config: AdminConfig,
   availableColumns?: ReadonlySet<string>,
 ) {
-  const payload = mapPayloadToSource(resource, data, sample, availableColumns);
-  if (!Object.keys(payload).length) return;
+  if (resource === "services" && availableColumns?.size && ![...availableColumns].some((column) => nicheRelationColumns.has(column))) {
+    throw new Error(directNicheSchemaMessage);
+  }
+  let payload = mapPayloadToSource(resource, data, sample, availableColumns);
+  if (!Object.keys(payload).length) return null;
   const { url, key, schema, tables } = config;
   const idColumn = sourceIdColumn(resource, sample, availableColumns);
   const endpoint = url + "/rest/v1/" + encodeURIComponent(tables[resource]) + "?" + encodeURIComponent(idColumn) + "=eq." + encodeURIComponent(id);
-  const response = await fetch(endpoint, {
-    method: "PATCH",
-    headers: supabaseHeaders(key, schema, true),
-    body: JSON.stringify(payload),
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(await readError(response));
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const response = await fetch(endpoint, {
+      method: "PATCH",
+      headers: supabaseHeaders(key, schema, true),
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+    if (response.ok) {
+      const returned = await response.json().catch(() => []);
+      return (Array.isArray(returned) ? returned[0] : returned) as Record<string, unknown> | null;
+    }
+    const detail = await readError(response);
+    const column = /PGRST204/i.test(detail) ? missingColumn(detail) : null;
+    if (column && Object.prototype.hasOwnProperty.call(payload, column)) {
+      if (resource === "services" && nicheRelationColumns.has(column)) throw new Error(directNicheSchemaMessage);
+      const next = { ...payload };
+      delete next[column];
+      payload = next;
+      if (!Object.keys(payload).length) return null;
+      continue;
+    }
+    throw new Error(detail);
+  }
+  throw new Error("Não foi possível alterar o cadastro após validar as colunas do Supabase.");
 }
 
 async function ensureClinicCatalog(config: AdminConfig, columns: ColumnMap) {
@@ -207,35 +245,22 @@ async function ensureClinicCatalog(config: AdminConfig, columns: ColumnMap) {
     await updateCatalogRow("niches", nicheId, { description: clinicBootstrapPending }, initialNiches[0] || {}, config, columns.niches);
   }
 
-  const initialCategories = await loadRows("categories", config);
-  let category = normalizeAdminRows("categories", initialCategories, nicheId).find((item) => (
-    normalizeSeedName(item.name) === "clinicas" && String(item.niche_id) === nicheId
-  ));
-  // A completed marker makes the bootstrap idempotent; an unmarked/partial
-  // niche is allowed to finish after a failed request.
-  if (!category && !shouldBootstrap) return { nicheId, categoryId: "", addedServices: 0 };
-  if (!category) {
-    const created = await insertCatalogRow("categories", { niche_id: nicheId, name: "Clínicas", sort_order: 0, active: true }, initialCategories[0] || {}, config, columns.categories);
-    category = normalizeAdminRows("categories", [created], nicheId)[0];
-  }
-  const categoryId = String(category?.id || "").trim();
-  if (!categoryId) throw new Error("A categoria Clínicas foi criada sem identificador.");
-
-  // Services are bootstrapped only with the newly created niche/category.
-  // Subsequent admin reads never recreate a service that the owner removed.
-  if (!shouldBootstrap) return { nicheId, categoryId, addedServices: 0 };
-
   const initialServices = await loadRows("services", config);
+  if (columns.services?.size && ![...columns.services].some((column) => nicheRelationColumns.has(column))) {
+    throw new Error(directNicheSchemaMessage);
+  }
+  // Services are bootstrapped directly under the niche. Subsequent admin
+  // reads never recreate a service that the owner removed.
+  if (!shouldBootstrap) return { nicheId, addedServices: 0 };
   const normalizedServices = normalizeAdminRows("services", initialServices, nicheId);
   let addedServices = 0;
   for (const seed of clinicSeedServices) {
     const exists = normalizedServices.some((item) => (
-      normalizeSeedName(item.name) === normalizeSeedName(seed.name) && String(item.category_id) === categoryId
+      normalizeSeedName(item.name) === normalizeSeedName(seed.name) && (!item.niche_id || String(item.niche_id) === nicheId)
     ));
     if (exists) continue;
     const created = await insertCatalogRow("services", {
       niche_id: nicheId,
-      category_id: categoryId,
       name: seed.name,
       description: seed.description,
       unit: seed.unit,
@@ -250,7 +275,7 @@ async function ensureClinicCatalog(config: AdminConfig, columns: ColumnMap) {
     addedServices += 1;
   }
   await updateCatalogRow("niches", nicheId, { description: clinicBootstrapComplete }, initialNiches[0] || {}, config, columns.niches);
-  return { nicheId, categoryId, addedServices };
+  return { nicheId, addedServices };
 }
 
 type LegacyCleanup = {
@@ -356,19 +381,10 @@ export async function GET() {
     const seeded = await ensureClinicCatalog(resolved.config, columns);
     const nicheRows = await loadRows("niches", resolved.config);
     const fallbackNicheId = nicheRows.length === 1 ? String(normalizeAdminRows("niches", nicheRows)[0]?.id || "") : "";
-    const [categoryRows, serviceRows] = await Promise.all([
-      loadRows("categories", resolved.config),
-      loadRows("services", resolved.config),
-    ]);
-    const categories = normalizeAdminRows("categories", categoryRows, fallbackNicheId);
-    const categoryNiches = new Map(categories.filter((item) => item.id && item.niche_id).map((item) => [item.id, item.niche_id]));
-    const services = normalizeAdminRows("services", serviceRows, fallbackNicheId).map((item) => ({
-      ...item,
-      niche_id: item.niche_id || categoryNiches.get(String(item.category_id || "")) || "",
-    }));
+    const serviceRows = await loadRows("services", resolved.config);
+    const services = normalizeAdminRows("services", serviceRows, fallbackNicheId);
     return NextResponse.json({
       niches: normalizeAdminRows("niches", nicheRows),
-      categories,
       services,
       seeded,
     }, { headers: { "Cache-Control": "no-store" } });
@@ -384,7 +400,7 @@ export async function POST(request: Request) {
   const resolved = configResponse();
   if (!resolved.config) return resolved.response;
   const canonical = cleanAdminPayload(body.resource, body.data);
-  if (!canonical.name || (body.resource === "services" && (!canonical.niche_id || !canonical.category_id))) {
+  if (!canonical.name || (body.resource === "services" && !canonical.niche_id)) {
     return NextResponse.json({ message: "Preencha os campos obrigatórios." }, { status: 400 });
   }
   try {
@@ -406,17 +422,8 @@ export async function PATCH(request: Request) {
   try {
     const columns = await loadSchemaColumns(resolved.config);
     const sample = (await loadRows(body.resource, resolved.config, true))[0] || {};
-    const payload = mapPayloadToSource(body.resource, cleanAdminPayload(body.resource, body.data), sample, columns[body.resource]);
-    const idColumn = sourceIdColumn(body.resource, sample, columns[body.resource]);
-    const { url, key, schema, tables } = resolved.config;
-    const endpoint = url + "/rest/v1/" + encodeURIComponent(tables[body.resource]) + "?" + encodeURIComponent(idColumn) + "=eq." + encodeURIComponent(String(body.id));
-    const response = await fetch(endpoint, {
-      method: "PATCH",
-      headers: supabaseHeaders(key, schema, true),
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) return NextResponse.json({ message: await readError(response) }, { status: response.status });
-    return NextResponse.json({ item: (await response.json())[0] });
+    const item = await updateCatalogRow(body.resource, String(body.id), cleanAdminPayload(body.resource, body.data), sample, resolved.config, columns[body.resource]);
+    return NextResponse.json({ item });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : "Não foi possível alterar." }, { status: 502 });
   }

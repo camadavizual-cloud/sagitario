@@ -40,7 +40,6 @@ export async function GET() {
   const schema = process.env.SUPABASE_SCHEMA || "public";
   const tables = {
     niches: process.env.SUPABASE_NICHES_TABLE || "niches",
-    categories: process.env.SUPABASE_CATEGORIES_TABLE || "categories",
     services: process.env.SUPABASE_SERVICES_TABLE || "services",
     company: process.env.SUPABASE_COMPANY_TABLE || "company_settings",
   };
@@ -68,30 +67,40 @@ export async function GET() {
     return response.json() as Promise<Row[]>;
   };
 
+  const ensureDirectNicheRelation = async (rows: Row[]) => {
+    const relationColumns = ["niche_id", "nicho_id", "segment_id", "niche_ids", "nicho_ids"];
+    if (rows.length && rows.some((row) => relationColumns.some((column) => Object.prototype.hasOwnProperty.call(row, column)))) return;
+    for (const column of relationColumns) {
+      const response = await fetch(`${url}/rest/v1/${encodeURIComponent(tables.services)}?select=${encodeURIComponent(column)}&limit=0`, {
+        headers: { apikey: key, "Accept-Profile": schema, ...(key.startsWith("sb_") ? {} : { Authorization: `Bearer ${key}` }) },
+        cache: "no-store",
+      });
+      if (response.ok) return;
+    }
+    throw new Error("A tabela services precisa de uma coluna niche_id (ou niche_ids) ligada a niches. Execute a migração SQL da versão de dois níveis.");
+  };
+
   try {
-    const [nicheRows, categoryRows, serviceRows, companyRows] = await Promise.all([
-      read(tables.niches), read(tables.categories), read(tables.services), read(tables.company),
+    const [nicheRows, serviceRows, companyRows] = await Promise.all([
+      read(tables.niches), read(tables.services), read(tables.company),
     ]);
+    await ensureDirectNicheRelation(serviceRows);
 
     const active = (row: Row) => value(row, "active", "ativo", "is_active") === undefined || bool(row, "active", "ativo", "is_active");
     const niches = nicheRows.filter(active).map((row) => ({ id: text(row, "id", "uuid", "slug"), name: text(row, "name", "nome", "title", "titulo") })).filter((item) => item.id && item.name);
-    const categories = categoryRows.filter(active).map((row) => ({ id: text(row, "id", "uuid", "slug"), name: text(row, "name", "nome", "title", "titulo"), nicheId: text(row, "niche_id", "nicho_id", "segment_id") || null, order: number(row, "sort_order", "order", "ordem", "position") }));
-    const categoryNiches = new Map(categories.filter((category) => category.id && category.nicheId).map((category) => [category.id, category.nicheId as string]));
     const services = serviceRows.filter(active).map((row) => {
-      const categoryId = text(row, "category_id", "categoria_id") || null;
       const nicheIds = ids(row);
-      if (!nicheIds.length && categoryId && categoryNiches.has(categoryId)) nicheIds.push(categoryNiches.get(categoryId) as string);
       return {
       id: text(row, "id", "uuid"), name: text(row, "name", "nome", "title", "titulo"), description: text(row, "description", "commercial_description", "descricao", "resumo"),
-      categoryId, nicheIds, unit: text(row, "unit", "unidade", "price_unit") || "unidade",
+      nicheIds, unit: text(row, "unit", "unidade", "price_unit") || "unidade",
       billingType: billingType(row), price: number(row, "price", "preco", "valor", "unit_price"), defaultQuantity: Math.max(1, number(row, "default_quantity", "quantidade_padrao") || 1),
       minQuantity: Math.max(1, number(row, "min_quantity", "quantidade_minima") || 1), maxQuantity: number(row, "max_quantity", "quantidade_maxima") || null,
       };
-    }).filter((item) => item.id && item.name);
+    }).filter((item) => item.id && item.name && item.nicheIds.length);
     const companyRow = companyRows.find(active) || null;
     const company = companyRow ? { name: text(companyRow, "name", "nome", "company_name", "razao_social") || "Frame Rec", logoUrl: text(companyRow, "logo_url", "logo", "brand_logo_url") || null, document: text(companyRow, "document", "cnpj"), email: text(companyRow, "email", "contact_email"), phone: text(companyRow, "phone", "telefone", "whatsapp"), address: text(companyRow, "address", "endereco") } : null;
 
-    return NextResponse.json({ niches, categories, services, company }, { headers: { "Cache-Control": "no-store", "X-Sagitario-Build": "supabase-schema-preflight-v1", "X-Sagitario-Niche-Columns": Object.keys(nicheRows[0] || {}).sort().join(","), "X-Sagitario-Category-Columns": Object.keys(categoryRows[0] || {}).sort().join(","), "X-Sagitario-Service-Columns": Object.keys(serviceRows[0] || {}).sort().join(",") } });
+    return NextResponse.json({ niches, services, company }, { headers: { "Cache-Control": "no-store", "X-Sagitario-Build": "niches-services-v1", "X-Sagitario-Niche-Columns": Object.keys(nicheRows[0] || {}).sort().join(","), "X-Sagitario-Service-Columns": Object.keys(serviceRows[0] || {}).sort().join(",") } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao ler o catálogo do Supabase.";
     const invalidKey = /invalid api key/i.test(message);

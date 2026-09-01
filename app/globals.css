@@ -1208,3 +1208,9 @@ body { font-family: "Montserrat", ui-sans-serif, system-ui, -apple-system, Blink
   }
   [data-ui="saas-v4"] .mobileBottomBar div strong { font-size: 29px; }
 }
+
+.proposalFields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+@media (max-width: 820px) {
+  .proposalFields { grid-template-columns: 1fr; }
+}

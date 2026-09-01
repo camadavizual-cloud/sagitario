@@ -276,10 +276,16 @@ export async function GET() {
       loadRows("categories", resolved.config),
       loadRows("services", resolved.config),
     ]);
+    const categories = normalizeAdminRows("categories", categoryRows, fallbackNicheId);
+    const categoryNiches = new Map(categories.filter((item) => item.id && item.niche_id).map((item) => [item.id, item.niche_id]));
+    const services = normalizeAdminRows("services", serviceRows, fallbackNicheId).map((item) => ({
+      ...item,
+      niche_id: item.niche_id || categoryNiches.get(String(item.category_id || "")) || "",
+    }));
     return NextResponse.json({
       niches: normalizeAdminRows("niches", nicheRows),
-      categories: normalizeAdminRows("categories", categoryRows, fallbackNicheId),
-      services: normalizeAdminRows("services", serviceRows, fallbackNicheId),
+      categories,
+      services,
       seeded,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

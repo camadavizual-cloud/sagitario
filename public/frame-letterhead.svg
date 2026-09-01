@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595.5 842.25" role="img" aria-label="Papel timbrado Frame Rec">
+  <rect width="595.5" height="842.25" fill="#fff"/>
+  <g fill="#555" font-family="Montserrat,Arial,sans-serif" font-size="8">
+    <text x="26" y="31" font-weight="700">@framerec</text>
+    <text x="26" y="45">www.framerec.com.br</text>
+    <text x="402" y="31">contato@framerec.com.br</text>
+    <text x="478" y="45">(79) 99890-6462</text>
+  </g>
+  <g fill="#dfe0e0" font-family="Montserrat,Arial,sans-serif" font-size="210" font-weight="700" opacity=".7">
+    <text x="260" y="415">FR</text>
+  </g>
+  <path d="M0 812h334c25 0 44-13 57-37l8-15h197v82H0z" fill="#1d2221"/>
+  <g fill="#3b3f3e" font-family="Montserrat,Arial,sans-serif" font-size="8">
+    <text x="26" y="790">@framerec</text>
+    <text x="188" y="790">contato@framerec.com.br</text>
+    <text x="26" y="805">www.framerec.com.br</text>
+    <text x="188" y="805">(79) 99890-6462</text>
+  </g>
+</svg>

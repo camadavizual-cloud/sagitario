@@ -122,7 +122,7 @@ export default function Home() {
       <div className="workspaceGrid">
         <div className="mainColumn">
           <section className="sectionBlock servicesSection" id="services" aria-labelledby="services-title">
-            <div className="sectionTitle"><span className="stepNumber">02</span><div><h2 id="services-title">Lista de serviços</h2><p>Marque, ajuste a quantidade e acompanhe o subtotal.</p></div></div>
+            <div className="sectionTitle"><span className="stepNumber">02</span><div><h2 id="services-title">Marque os serviços</h2><p>Toque em uma linha para incluir e ajuste a quantidade quando precisar.</p></div></div>
             <div className="filtersBar"><label className="searchField"><span className="srOnly">Pesquisar serviços</span><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar serviço" /></label></div>
             {filteredServices.length ? <div className="serviceGroup"><h3>{currentNiche?.name || "Serviços disponíveis"}<span>{filteredServices.length}</span></h3><div className="serviceList">{filteredServices.map((service) => {
               const checked = selection[service.id] !== undefined; const quantity = selection[service.id] ?? service.defaultQuantity;

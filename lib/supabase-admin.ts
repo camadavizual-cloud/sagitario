@@ -72,7 +72,7 @@ const slugify = (input: string) => input.normalize("NFD").replace(/[\u0300-\u036
 
 function billing(input: unknown): "monthly" | "one_time" | "setup" {
   const value = asText(input).toLowerCase();
-  if (["monthly", "mensal", "recurring", "recorrente"].includes(value)) return "monthly";
+  if (["monthly", "mensal", "recurring", "recorrente", "subscription", "assinatura"].includes(value)) return "monthly";
   if (["setup", "initial", "taxa_inicial", "implantacao", "implantação"].includes(value)) return "setup";
   return "one_time";
 }

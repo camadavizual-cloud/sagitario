@@ -33,12 +33,19 @@ function missingColumn(detail: string) {
 
 const nicheRelationColumns = new Set(["niche_id", "nicho_id", "segment_id", "niche_ids", "nicho_ids"]);
 const directNicheSchemaMessage = "Para usar apenas Nicho → Serviço, a tabela services precisa ter uma coluna niche_id (ou niche_ids) ligada à tabela niches. Execute a migração SQL fornecida nesta versão e tente novamente.";
+const billingColumns = new Set(["billing_type", "charge_type", "tipo_cobranca", "tipo_cobrança", "cobranca", "cobrança", "recurrence"]);
+const billingValueAliases: Record<ClinicSeed["billing_type"], string[]> = {
+  one_time: ["one_time", "pontual", "PONTUAL", "one-time", "one time", "avulso", "AVULSO", "avulsa", "single", "fixed", "once", "oneoff"],
+  monthly: ["monthly", "mensal", "MENSAL", "recurring", "recorrente", "subscription", "assinatura"],
+  setup: ["setup", "SETUP", "initial", "taxa_inicial", "taxa inicial", "implantacao", "implantação", "activation", "ativacao", "ativação"],
+};
 
 type AdminConfig = ReturnType<typeof getSupabaseAdminConfig> & { url: string; key: string };
 type ConfigResult =
   | { config: AdminConfig; response: null }
   | { config: null; response: NextResponse };
 type ColumnMap = Partial<Record<AdminResource, Set<string>>>;
+type EnumMap = Partial<Record<AdminResource, Record<string, string[]>>>;
 
 type ClinicSeed = {
   name: string;
@@ -79,7 +86,7 @@ const record = (value: unknown): Record<string, unknown> => (
   value && typeof value === "object" ? value as Record<string, unknown> : {}
 );
 
-let schemaCache: { fingerprint: string; columns: ColumnMap } | null = null;
+let schemaCache: { fingerprint: string; columns: ColumnMap; enums: EnumMap } | null = null;
 
 function schemaFingerprint(config: AdminConfig) {
   return [config.url, config.schema, config.tables.niches, config.tables.services].join("|");
@@ -89,6 +96,7 @@ async function loadSchemaColumns(config: AdminConfig): Promise<ColumnMap> {
   const fingerprint = schemaFingerprint(config);
   if (schemaCache?.fingerprint === fingerprint) return schemaCache.columns;
   const columns: ColumnMap = {};
+  const enums: EnumMap = {};
   try {
     const response = await fetch(config.url + "/rest/v1/", {
       headers: supabaseHeaders(config.key, config.schema),
@@ -103,15 +111,51 @@ async function loadSchemaColumns(config: AdminConfig): Promise<ColumnMap> {
       const table = config.tables[resource];
       const definition = record(definitions[table] || schemas[table]);
       const properties = record(definition.properties);
-      if (Object.keys(properties).length) columns[resource] = new Set(Object.keys(properties));
+      if (Object.keys(properties).length) {
+        columns[resource] = new Set(Object.keys(properties));
+        const resourceEnums: Record<string, string[]> = {};
+        for (const [column, value] of Object.entries(properties)) {
+          const property = record(value);
+          if (Array.isArray(property.enum)) {
+            const values = property.enum.map((item) => String(item)).filter(Boolean);
+            if (values.length) resourceEnums[column] = values;
+          }
+        }
+        if (Object.keys(resourceEnums).length) enums[resource] = resourceEnums;
+      }
     }
   } catch {
     // The schema endpoint is a preflight enhancement. Existing row samples and
     // the compatibility payloads below remain the safe fallback when it is
     // unavailable in a restricted PostgREST configuration.
   }
-  schemaCache = { fingerprint, columns };
+  schemaCache = { fingerprint, columns, enums };
   return columns;
+}
+
+function uniqueValues(values: Iterable<unknown>) {
+  return [...new Set([...values].map((value) => String(value ?? "").trim()).filter(Boolean))];
+}
+
+function billingEnumCandidates(resource: AdminResource, current: unknown, sample: Record<string, unknown>) {
+  const canonical = String(current ?? "one_time").trim().toLowerCase() as ClinicSeed["billing_type"];
+  const fallback = billingValueAliases[canonical] || billingValueAliases.one_time;
+  const schemaValues = billingColumns.values();
+  const knownValues: string[] = [];
+  for (const column of schemaValues) {
+    const values = schemaCache?.enums[resource]?.[column];
+    if (values) knownValues.push(...values);
+    if (sample[column] !== undefined && sample[column] !== null) knownValues.push(String(sample[column]));
+  }
+  return uniqueValues([current, ...knownValues, ...fallback]);
+}
+
+function billingColumn(payload: Record<string, unknown>) {
+  return Object.keys(payload).find((column) => billingColumns.has(column));
+}
+
+function isBillingEnumError(detail: string) {
+  return /22P02|invalid input value for enum/i.test(detail) && /billing|charge|cobran|recurr|tipo/i.test(detail);
 }
 
 async function loadRows(resource: AdminResource, config: AdminConfig, limitOne = false) {
@@ -151,9 +195,13 @@ async function insertCatalogRow(
   const { url, key, schema, tables } = config;
   let lastError = "Não foi possível criar o cadastro.";
   let missingNicheRelation = false;
+  let billingEnumFailure = false;
   for (const initialCandidate of payloads) {
     const candidate = { ...initialCandidate };
+    const attemptedBillingValues = new Set<string>();
     for (let attempt = 0; attempt < 16; attempt += 1) {
+      const currentBillingColumn = billingColumn(candidate);
+      if (currentBillingColumn) attemptedBillingValues.add(String(candidate[currentBillingColumn] ?? ""));
       const response = await fetch(url + "/rest/v1/" + encodeURIComponent(tables[resource]), {
         method: "POST",
         headers: supabaseHeaders(key, schema, true),
@@ -162,6 +210,15 @@ async function insertCatalogRow(
       });
       if (!response.ok) {
         lastError = await readError(response);
+        if (currentBillingColumn && isBillingEnumError(lastError)) {
+          billingEnumFailure = true;
+          const nextBillingValue = billingEnumCandidates(resource, candidate[currentBillingColumn], sample)
+            .find((value) => !attemptedBillingValues.has(value));
+          if (nextBillingValue) {
+            candidate[currentBillingColumn] = nextBillingValue;
+            continue;
+          }
+        }
         const column = /PGRST204/i.test(lastError) ? missingColumn(lastError) : null;
         if (column && Object.prototype.hasOwnProperty.call(candidate, column)) {
           if (resource === "services" && nicheRelationColumns.has(column)) {
@@ -180,6 +237,9 @@ async function insertCatalogRow(
     }
   }
   if (resource === "services" && missingNicheRelation) throw new Error(directNicheSchemaMessage);
+  if (billingEnumFailure) {
+    throw new Error("O tipo de cobrança configurado no Supabase usa valores diferentes dos aceitos pelo painel. Verifique o enum da coluna billing_type e inclua Pontual, Mensal ou Taxa inicial.");
+  }
   throw new Error(lastError);
 }
 
@@ -199,7 +259,10 @@ async function updateCatalogRow(
   const { url, key, schema, tables } = config;
   const idColumn = sourceIdColumn(resource, sample, availableColumns);
   const endpoint = url + "/rest/v1/" + encodeURIComponent(tables[resource]) + "?" + encodeURIComponent(idColumn) + "=eq." + encodeURIComponent(id);
+  const attemptedBillingValues = new Set<string>();
   for (let attempt = 0; attempt < 16; attempt += 1) {
+    const currentBillingColumn = billingColumn(payload);
+    if (currentBillingColumn) attemptedBillingValues.add(String(payload[currentBillingColumn] ?? ""));
     const response = await fetch(endpoint, {
       method: "PATCH",
       headers: supabaseHeaders(key, schema, true),
@@ -211,6 +274,15 @@ async function updateCatalogRow(
       return (Array.isArray(returned) ? returned[0] : returned) as Record<string, unknown> | null;
     }
     const detail = await readError(response);
+    if (currentBillingColumn && isBillingEnumError(detail)) {
+      const nextBillingValue = billingEnumCandidates(resource, payload[currentBillingColumn], sample)
+        .find((value) => !attemptedBillingValues.has(value));
+      if (nextBillingValue) {
+        payload = { ...payload, [currentBillingColumn]: nextBillingValue };
+        continue;
+      }
+      throw new Error("O tipo de cobrança configurado no Supabase usa valores diferentes dos aceitos pelo painel. Verifique o enum da coluna billing_type e inclua Pontual, Mensal ou Taxa inicial.");
+    }
     const column = /PGRST204/i.test(detail) ? missingColumn(detail) : null;
     if (column && Object.prototype.hasOwnProperty.call(payload, column)) {
       if (resource === "services" && nicheRelationColumns.has(column)) throw new Error(directNicheSchemaMessage);

@@ -113,12 +113,14 @@ async function insertCatalogRow(
 
 async function ensureClinicCatalog(config: AdminConfig) {
   const initialNiches = await loadRows("niches", config);
+  let createdNiche = false;
   let niche = normalizeAdminRows("niches", initialNiches).find((item) => (
     normalizeSeedName(item.name) === "clinicas" || normalizeSeedName(item.slug) === "clinicas"
   ));
   if (!niche) {
     const created = await insertCatalogRow("niches", { name: "Clínicas", slug: "clinicas", active: true }, initialNiches[0] || {}, config);
     niche = normalizeAdminRows("niches", [created])[0];
+    createdNiche = true;
   }
   const nicheId = String(niche?.id || "").trim();
   if (!nicheId) throw new Error("O nicho Clínicas foi criado sem identificador.");
@@ -127,12 +129,19 @@ async function ensureClinicCatalog(config: AdminConfig) {
   let category = normalizeAdminRows("categories", initialCategories, nicheId).find((item) => (
     normalizeSeedName(item.name) === "clinicas" && String(item.niche_id) === nicheId
   ));
+  // Once the niche exists, leave an intentionally deleted category alone.
+  // This makes the bootstrap idempotent without resurrecting user deletions.
+  if (!category && !createdNiche) return { nicheId, categoryId: "", addedServices: 0 };
   if (!category) {
     const created = await insertCatalogRow("categories", { niche_id: nicheId, name: "Clínicas", sort_order: 0, active: true }, initialCategories[0] || {}, config);
     category = normalizeAdminRows("categories", [created], nicheId)[0];
   }
   const categoryId = String(category?.id || "").trim();
   if (!categoryId) throw new Error("A categoria Clínicas foi criada sem identificador.");
+
+  // Services are bootstrapped only with the newly created niche/category.
+  // Subsequent admin reads never recreate a service that the owner removed.
+  if (!createdNiche) return { nicheId, categoryId, addedServices: 0 };
 
   const initialServices = await loadRows("services", config);
   const normalizedServices = normalizeAdminRows("services", initialServices, nicheId);
